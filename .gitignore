@@ -1,41 +1,18 @@
-# Dependencies
-node_modules/
+# Rust
 target/
 Cargo.lock
 
-# DFX
-.dfx/
-dfx_generated/
+# Node
+node_modules/
+dist/
+*.log
 
-# Environment variables
+# ICP
 .env
-.env.local
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+.dfx/
+canisters/vault/vault.did
+canisters/indexer_stub/indexer_stub.did
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Build outputs
-dist/
-build/
-*.wasm
-*.wasm.gz
-
-# Logs
-*.log
-npm-debug.log*
-
-# Test coverage
-coverage/
-
-# Temporary files
-*.tmp
-*.temp
-
