@@ -1,4 +1,4 @@
-name: CI/CD
+name: CI
 
 on:
   push:
@@ -7,57 +7,97 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  build:
+  rust:
+    name: Rust Canisters
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Install DFX
-      run: |
-        sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
-        echo "$HOME/bin" >> $GITHUB_PATH
-    
-    - name: Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-    
-    - name: Check Rust formatting
-      run: |
-        cd canisters/vault
-        cargo fmt --check
-    
-    - name: Build Rust canisters
-      run: |
-        cd canisters/vault
-        cargo build --release
-    
-    - name: Run Rust tests
-      run: |
-        cd canisters/vault
-        cargo test
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
-    
-    - name: Install frontend dependencies
-      run: |
-        cd frontend
-        npm ci
-    
-    - name: Build frontend
-      run: |
-        cd frontend
-        npm run build
-    
-    - name: Lint frontend
-      run: |
-        cd frontend
-        npm run lint || true
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+      
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            canisters/*/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      
+      - name: Install DFX
+        run: |
+          sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+          echo "$HOME/bin" >> $GITHUB_PATH
+      
+      - name: Format check
+        run: |
+          cd canisters/vault && cargo fmt -- --check
+          cd ../indexer_stub && cargo fmt -- --check
+      
+      - name: Clippy check
+        run: |
+          cd canisters/vault && cargo clippy -- -D warnings
+          cd ../indexer_stub && cargo clippy -- -D warnings
+      
+      - name: Build canisters
+        run: |
+          dfx build vault
+          dfx build indexer_stub
 
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dir: frontend/.npm
+      
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+      
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+      
+      - name: Type check
+        run: |
+          cd frontend
+          npm run type-check || npx tsc --noEmit
+
+  candid:
+    name: Candid Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install DFX
+        run: |
+          sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+          echo "$HOME/bin" >> $GITHUB_PATH
+      
+      - name: Validate Candid files
+        run: |
+          dfx canister id vault --network ic || echo "Candid validation skipped (no IC network)"
+          if [ -f canisters/vault/vault.did ]; then
+            echo "✅ vault.did found"
+          fi

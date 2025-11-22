@@ -19,36 +19,28 @@ if ! dfx ping local 2>/dev/null; then
     sleep 5
 fi
 
-# Deploy vault canister
-echo "📦 Deploying vault canister..."
-cd canisters/vault
+# Build and deploy vault canister
+echo "📦 Building and deploying vault canister..."
+dfx build vault --network local
 dfx deploy vault --network local
-cd ../..
 
-# Deploy indexer stub canister
-echo "📦 Deploying indexer_stub canister..."
-cd canisters/indexer_stub
+# Build and deploy indexer stub canister
+echo "📦 Building and deploying indexer_stub canister..."
+dfx build indexer_stub --network local
 dfx deploy indexer_stub --network local
-cd ../..
-
-# Deploy governance canister
-echo "📦 Deploying governance canister..."
-cd canisters/governance
-dfx deploy governance --network local
-cd ../..
 
 # Build frontend
 echo "📦 Building frontend..."
 cd frontend
-npm install
+if [ ! -d "node_modules" ]; then
+    npm install
+fi
 npm run build
 cd ..
 
 # Deploy frontend canister
 echo "📦 Deploying frontend canister..."
-cd canisters/frontend_canister
-dfx deploy frontend_canister --network local
-cd ../..
+dfx deploy frontend --network local
 
 echo "✅ All canisters deployed successfully!"
 echo ""
@@ -56,6 +48,5 @@ echo "🌐 Frontend URL: http://localhost:4943"
 echo "📊 Canister IDs:"
 dfx canister id vault --network local
 dfx canister id indexer_stub --network local
-dfx canister id governance --network local
-dfx canister id frontend_canister --network local
+dfx canister id frontend --network local
 

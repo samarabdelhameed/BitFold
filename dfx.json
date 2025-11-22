@@ -1,30 +1,23 @@
 {
-  "version": 1,
   "canisters": {
     "vault": {
       "type": "rust",
       "package": "vault",
-      "candid": "canisters/vault/src/vault.did"
+      "candid": "canisters/vault/vault.did"
     },
     "indexer_stub": {
       "type": "rust",
-      "package": "indexer_stub",
-      "candid": "canisters/indexer_stub/src/indexer_stub.did"
+      "package": "indexer_stub"
     },
-    "governance": {
-      "type": "rust",
-      "package": "governance",
-      "candid": "canisters/governance/src/governance.did"
-    },
-    "frontend_canister": {
+    "frontend": {
       "type": "assets",
       "source": ["frontend/dist"]
     }
   },
-  "networks": {
-    "local": {
-      "bind": "127.0.0.1:4943"
-    }
-  }
+  "defaults": {
+    "build": { "packtool": "" }
+  },
+  "output_env_file": ".env",
+  "version": 1
 }
 
