@@ -1,6 +1,26 @@
-# BitFold
+# BitFold 🚀
 
-BitFold is a decentralized lending platform that enables Bitcoin holders to use their Bitcoin UTXOs (including Ordinals) as collateral to borrow ckBTC on the Internet Computer.
+**BitFold** is a revolutionary decentralized lending platform that enables Bitcoin holders to unlock liquidity from their Bitcoin UTXOs and Ordinals NFTs without selling their assets. Built on the Internet Computer Protocol, BitFold allows users to use their Bitcoin as collateral to borrow ckBTC (Chain-Key Bitcoin) seamlessly and securely.
+
+## 🎯 Project Vision
+
+BitFold bridges the gap between Bitcoin's store of value and DeFi liquidity, enabling Bitcoin holders to:
+
+- **Maintain ownership** of their Bitcoin while accessing liquidity
+- **Leverage Ordinals NFTs** as collateral for the first time
+- **Borrow ckBTC** with competitive rates and flexible terms
+- **Experience true decentralization** on the Internet Computer
+
+## 💡 Problem Statement
+
+Bitcoin holders face a fundamental dilemma: they want to access liquidity from their Bitcoin holdings, but selling means losing their position in the market. Traditional lending solutions are either:
+
+- Centralized and require KYC
+- Limited to specific jurisdictions
+- Don't support Ordinals NFTs
+- Have high barriers to entry
+
+BitFold solves this by providing a **fully decentralized, permissionless** lending platform that works globally.
 
 ## Overview
 
