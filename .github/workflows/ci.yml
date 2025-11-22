@@ -1,0 +1,63 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install DFX
+      run: |
+        sh -ci "$(curl -fsSL https://sdk.dfinity.org/install.sh)"
+        echo "$HOME/bin" >> $GITHUB_PATH
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    
+    - name: Check Rust formatting
+      run: |
+        cd canisters/vault
+        cargo fmt --check
+    
+    - name: Build Rust canisters
+      run: |
+        cd canisters/vault
+        cargo build --release
+    
+    - name: Run Rust tests
+      run: |
+        cd canisters/vault
+        cargo test
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm ci
+    
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+    
+    - name: Lint frontend
+      run: |
+        cd frontend
+        npm run lint || true
+

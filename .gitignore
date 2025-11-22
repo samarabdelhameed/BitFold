@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+target/
+Cargo.lock
+
+# DFX
+.dfx/
+dfx_generated/
+
+# Environment variables
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+build/
+*.wasm
+*.wasm.gz
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+

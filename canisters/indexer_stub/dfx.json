@@ -1,0 +1,10 @@
+{
+  "canisters": {
+    "indexer_stub": {
+      "type": "rust",
+      "package": "indexer_stub",
+      "candid": "src/indexer_stub.did"
+    }
+  }
+}
+

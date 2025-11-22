@@ -1,0 +1,10 @@
+{
+  "canisters": {
+    "vault": {
+      "type": "rust",
+      "package": "vault",
+      "candid": "src/vault.did"
+    }
+  }
+}
+

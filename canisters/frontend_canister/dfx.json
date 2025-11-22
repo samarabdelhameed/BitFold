@@ -1,0 +1,9 @@
+{
+  "canisters": {
+    "frontend_canister": {
+      "type": "assets",
+      "source": ["../../frontend/dist"]
+    }
+  }
+}
+

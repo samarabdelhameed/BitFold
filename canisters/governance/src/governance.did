@@ -1,0 +1,19 @@
+// Candid interface for Governance canister
+
+type LTVConfig = record {
+  standard_btc: nat64;
+  ordinals: nat64;
+};
+
+type InterestRateConfig = record {
+  base_rate: nat64;
+  max_rate: nat64;
+};
+
+service : {
+  get_ltv_config: () -> (LTVConfig) query;
+  set_ltv_config: (LTVConfig) -> ();
+  get_interest_config: () -> (InterestRateConfig) query;
+  set_interest_config: (InterestRateConfig) -> ();
+}
+

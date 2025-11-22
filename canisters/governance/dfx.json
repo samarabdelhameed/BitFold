@@ -1,0 +1,10 @@
+{
+  "canisters": {
+    "governance": {
+      "type": "rust",
+      "package": "governance",
+      "candid": "src/governance.did"
+    }
+  }
+}
+

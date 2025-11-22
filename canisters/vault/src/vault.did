@@ -1,0 +1,76 @@
+// Candid interface for Vault canister
+// This file will be auto-generated from Rust code using candid-extractor
+
+type LoanId = nat64;
+type UtxoId = nat64;
+
+type LoanStatus = variant {
+  Active;
+  Repaid;
+  Liquidated;
+};
+
+type UtxoStatus = variant {
+  Deposited;
+  Locked;
+  Withdrawn;
+};
+
+type OrdinalInfo = record {
+  inscription_id: text;
+  content_type: text;
+  content_preview: opt text;
+  metadata: opt text;
+};
+
+type Loan = record {
+  id: LoanId;
+  user_id: principal;
+  collateral_utxo_id: UtxoId;
+  borrowed_amount: nat64;
+  repaid_amount: nat64;
+  interest_rate: nat64;
+  created_at: nat64;
+  status: LoanStatus;
+};
+
+type UTXO = record {
+  id: UtxoId;
+  txid: text;
+  vout: nat32;
+  amount: nat64;
+  address: text;
+  ordinal_info: opt OrdinalInfo;
+  status: UtxoStatus;
+  deposited_at: nat64;
+};
+
+type DepositUtxoRequest = record {
+  txid: text;
+  vout: nat32;
+  amount: nat64;
+  address: text;
+  ordinal_info: opt OrdinalInfo;
+};
+
+type BorrowRequest = record {
+  utxo_id: UtxoId;
+  amount: nat64;
+};
+
+type RepayRequest = record {
+  loan_id: LoanId;
+  amount: nat64;
+};
+
+service : {
+  deposit_utxo: (DepositUtxoRequest) -> (UtxoId);
+  borrow: (BorrowRequest) -> (LoanId);
+  repay: (RepayRequest) -> ();
+  withdraw_collateral: (UtxoId) -> ();
+  get_user_loans: () -> (vec Loan) query;
+  get_collateral: () -> (vec UTXO) query;
+  get_loan: (LoanId) -> (opt Loan) query;
+  get_utxo: (UtxoId) -> (opt UTXO) query;
+}
+

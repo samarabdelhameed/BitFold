@@ -1,0 +1,14 @@
+// Candid interface for Indexer Stub canister
+
+type OrdinalInfo = record {
+  inscription_id: text;
+  content_type: text;
+  content_preview: opt text;
+  metadata: opt text;
+};
+
+service : {
+  get_ordinal: (text, nat32) -> (opt OrdinalInfo) query;
+  has_ordinal: (text, nat32) -> (bool) query;
+}
+
