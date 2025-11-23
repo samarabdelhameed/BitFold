@@ -6,8 +6,8 @@
   - Ensure all modules are properly connected and exported
   - _Requirements: All_
 
-- [ ] 2. Implement Bitcoin integration with ICP Bitcoin API
-  - [ ] 2.1 Implement `verify_utxo()` function using ICP Bitcoin API
+- [x] 2. Implement Bitcoin integration with ICP Bitcoin API
+  - [x] 2.1 Implement `verify_utxo()` function using ICP Bitcoin API
     - Call `bitcoin_get_utxos` management canister method
     - Search returned UTXOs for matching txid and vout
     - Verify amount and address match
@@ -21,13 +21,13 @@
     - **Property 4: UTXO address must match**
     - **Validates: Requirements 1.1, 1.2, 1.3, 1.4**
 
-  - [ ] 2.3 Implement `get_utxos_for_address()` function
+  - [x] 2.3 Implement `get_utxos_for_address()` function
     - Call ICP Bitcoin API with address and min_confirmations
     - Parse and return UTXO list
     - Handle API errors gracefully
     - _Requirements: 1.1_
 
-  - [ ] 2.4 Implement `is_utxo_spent()` function
+  - [x] 2.4 Implement `is_utxo_spent()` function
     - Check if UTXO still exists in address's UTXO set
     - Return spent status
     - _Requirements: 2.2_
@@ -38,8 +38,8 @@
     - Test error handling for API failures
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 3. Implement Ordinals indexer integration
-  - [ ] 3.1 Implement `verify_ordinal()` using HTTP outcalls to Maestro API
+- [-] 3. Implement Ordinals indexer integration
+  - [x] 3.1 Implement `verify_ordinal()` using HTTP outcalls to Maestro API
     - Create HTTP request to Maestro API endpoint
     - Parse JSON response for inscription data
     - Return OrdinalInfo if inscription exists, None otherwise
