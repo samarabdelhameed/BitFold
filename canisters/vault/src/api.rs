@@ -2,12 +2,11 @@ use crate::helpers::*;
 use crate::state::State;
 use crate::types::*;
 use crate::{bitcoin, ckbtc, ordinals};
-use ic_cdk::api::msg_caller;
 
 /// Deposits a Bitcoin UTXO as collateral
 #[ic_cdk::update]
 pub async fn deposit_utxo(request: DepositUtxoRequest) -> Result<UtxoId, String> {
-    let caller = msg_caller();
+    let caller = ic_cdk::api::caller();
     
     // Validate input
     if !is_valid_txid(&request.txid) {
@@ -69,7 +68,7 @@ pub async fn deposit_utxo(request: DepositUtxoRequest) -> Result<UtxoId, String>
 /// Borrows ckBTC against deposited collateral
 #[ic_cdk::update]
 pub async fn borrow(request: BorrowRequest) -> Result<LoanId, String> {
-    let caller = msg_caller();
+    let caller = ic_cdk::api::caller();
     
     // Get UTXO
     let utxo = State::with_read(|state| {
@@ -137,14 +136,14 @@ pub async fn borrow(request: BorrowRequest) -> Result<LoanId, String> {
 /// Repays a loan
 #[ic_cdk::update]
 pub async fn repay(request: RepayRequest) -> Result<(), String> {
-    let caller = msg_caller();
+    let caller = ic_cdk::api::caller();
     
     // Get loan
     let loan = State::with_read(|state| {
         state.loans.get(&request.loan_id).cloned()
     });
     
-    let mut loan = loan.ok_or("Loan not found".to_string())?;
+    let loan = loan.ok_or("Loan not found".to_string())?;
     
     // Check loan belongs to caller
     if loan.user_id != caller {
@@ -189,7 +188,7 @@ pub async fn repay(request: RepayRequest) -> Result<(), String> {
 /// Withdraws collateral after full repayment
 #[ic_cdk::update]
 pub async fn withdraw_collateral(utxo_id: UtxoId) -> Result<(), String> {
-    let caller = msg_caller();
+    let caller = ic_cdk::api::caller();
     
     // Get UTXO
     let utxo = State::with_read(|state| {
@@ -236,7 +235,7 @@ pub async fn withdraw_collateral(utxo_id: UtxoId) -> Result<(), String> {
 /// Gets all loans for the caller
 #[ic_cdk::query]
 pub fn get_user_loans() -> Vec<Loan> {
-    let caller = msg_caller();
+    let caller = ic_cdk::api::caller();
     
     State::with_read(|state| {
         state.user_loans
@@ -254,7 +253,7 @@ pub fn get_user_loans() -> Vec<Loan> {
 /// Gets all collateral for the caller
 #[ic_cdk::query]
 pub fn get_collateral() -> Vec<UTXO> {
-    let caller = msg_caller();
+    let caller = ic_cdk::api::caller();
     
     State::with_read(|state| {
         state.user_utxos

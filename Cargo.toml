@@ -1,0 +1,14 @@
+[workspace]
+members = [
+    "canisters/vault",
+    "canisters/indexer_stub",
+    "canisters/governance",
+]
+resolver = "2"
+
+[profile.release]
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+codegen-units = 1

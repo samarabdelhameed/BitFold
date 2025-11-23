@@ -1,16 +1,87 @@
+type UtxoId = nat64;
+type LoanId = nat64;
+
+type OrdinalInfo = record {
+  inscription_id : text;
+  content_type : text;
+  content_preview : opt text;
+  metadata : opt text;
+};
+
+type UtxoStatus = variant {
+  Deposited;
+  Locked;
+  Withdrawn;
+};
+
+type UTXO = record {
+  id : UtxoId;
+  txid : text;
+  vout : nat32;
+  amount : nat64;
+  address : text;
+  ordinal_info : opt OrdinalInfo;
+  status : UtxoStatus;
+  deposited_at : nat64;
+};
+
+type LoanStatus = variant {
+  Active;
+  Repaid;
+  Liquidated;
+};
+
 type Loan = record {
-    loan_id : text;
-    borrower : text;
-    ordinal_utxo : text;
-    borrowed_ckbtc : nat64;
-    ltv_percent : nat8;
-    status : text;
+  id : LoanId;
+  user_id : principal;
+  collateral_utxo_id : UtxoId;
+  borrowed_amount : nat64;
+  repaid_amount : nat64;
+  interest_rate : nat64;
+  created_at : nat64;
+  status : LoanStatus;
+};
+
+type DepositUtxoRequest = record {
+  txid : text;
+  vout : nat32;
+  amount : nat64;
+  address : text;
+  ordinal_info : opt OrdinalInfo;
+};
+
+type BorrowRequest = record {
+  utxo_id : UtxoId;
+  amount : nat64;
+};
+
+type RepayRequest = record {
+  loan_id : LoanId;
+  amount : nat64;
+};
+
+type Result_UtxoId = variant {
+  Ok : UtxoId;
+  Err : text;
+};
+
+type Result_LoanId = variant {
+  Ok : LoanId;
+  Err : text;
+};
+
+type Result = variant {
+  Ok;
+  Err : text;
 };
 
 service : {
-    deposit_utxo : (text, text) -> (text);
-    borrow_ckbtc : (text, nat64) -> (text);
-    repay_ckbtc : (text, nat64) -> (text);
-    get_loan : (text) -> (opt Loan) query;
-    list_loans : () -> (vec Loan) query;
+  "deposit_utxo" : (DepositUtxoRequest) -> (Result_UtxoId);
+  "borrow" : (BorrowRequest) -> (Result_LoanId);
+  "repay" : (RepayRequest) -> (Result);
+  "withdraw_collateral" : (UtxoId) -> (Result);
+  "get_user_loans" : () -> (vec Loan) query;
+  "get_collateral" : () -> (vec UTXO) query;
+  "get_loan" : (LoanId) -> (opt Loan) query;
+  "get_utxo" : (UtxoId) -> (opt UTXO) query;
 }

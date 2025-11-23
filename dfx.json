@@ -7,7 +7,8 @@
     },
     "indexer_stub": {
       "type": "rust",
-      "package": "indexer_stub"
+      "package": "indexer_stub",
+      "candid": "canisters/indexer_stub/indexer_stub.did"
     },
     "frontend": {
       "type": "assets",
