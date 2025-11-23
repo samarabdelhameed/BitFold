@@ -32,7 +32,7 @@
     - Return spent status
     - _Requirements: 2.2_
 
-  - [ ]* 2.5 Write unit tests for Bitcoin integration
+  - [x]* 2.5 Write unit tests for Bitcoin integration
     - Test UTXO verification with valid data
     - Test UTXO verification with invalid data
     - Test error handling for API failures
@@ -86,7 +86,7 @@
     - **Property 12: Repayment verifies ckBTC transfer**
     - **Validates: Requirements 5.1**
 
-  - [ ] 4.5 Write unit tests for ckBTC integration
+  - [x] 4.5 Write unit tests for ckBTC integration
     - Test ckBTC transfer with valid parameters
     - Test transfer verification
     - Test balance queries
@@ -148,7 +148,7 @@
     - Add bounds checking
     - _Requirements: 4.1_
 
-  - [ ]* 6.2 Write property test for calculate_max_borrowable
+  - [x]* 6.2 Write property test for calculate_max_borrowable
     - **Property 9: Max borrowable amount calculation**
     - **Validates: Requirements 4.1**
 
@@ -157,7 +157,7 @@
     - Calculate interest based on time elapsed
     - _Requirements: 7.1, 7.3, 7.4_
 
-  - [ ]* 6.4 Write property test for loan value calculation
+  - [x]* 6.4 Write property test for loan value calculation
     - **Property 18: Interest calculation is correct**
     - **Property 20: Loan value includes interest**
     - **Validates: Requirements 7.1, 7.4**
@@ -167,7 +167,7 @@
     - Validate address length and characters
     - _Requirements: 8.4_
 
-  - [ ]* 6.6 Write property test for address validation
+  - [x]* 6.6 Write property test for address validation
     - **Property 24: Bitcoin address validation**
     - **Validates: Requirements 8.4**
 
@@ -176,7 +176,7 @@
     - Test with various invalid formats
     - _Requirements: 8.5_
 
-  - [ ]* 6.8 Write property test for txid validation
+  - [x]* 6.8 Write property test for txid validation
     - **Property 25: Transaction ID validation**
     - **Validates: Requirements 8.5**
 
@@ -187,14 +187,14 @@
     - Use `ic_cdk::storage::stable_save` and `stable_restore`
     - _Requirements: 10.1, 10.2, 10.3, 10.4_
 
-  - [ ]* 7.2 Write property test for state persistence
+  - [x]* 7.2 Write property test for state persistence
     - **Property 29: Canister upgrades preserve loans**
     - **Property 30: Canister upgrades preserve UTXOs**
     - **Property 31: Canister upgrades preserve user mappings**
     - **Property 32: Canister upgrades preserve ID counters**
     - **Validates: Requirements 10.1, 10.2, 10.3, 10.4**
 
-  - [ ]* 7.3 Write integration test for upgrade flow
+  - [x]* 7.3 Write integration test for upgrade flow
     - Create state before upgrade
     - Simulate upgrade
     - Verify all data preserved
@@ -278,7 +278,7 @@
     - Return vault statistics
     - _Requirements: 9.1, 9.2_
 
-  - [ ] 10.6 Write unit tests for additional functions
+  - [x] 10.6 Write unit tests for additional functions
     - Test liquidation logic
     - Test health factor calculation
     - Test statistics calculations
