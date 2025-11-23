@@ -1,0 +1,10 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 394ab0f6df7b2430f7657d8d8598f550573cf08fff64c586fc6470b13fc60ed7 # shrinks to txid = "0a0a0a0000a0aa0aa0aaaa000a000aaaa0aa00aaa0aa00a0aa0aaaa00aaa0aa0", vout = 0, amount = 1000, address_suffix = "a000aaaaaa"
+cc 54608177890cc7a0574a95cb604d534ef4ef29fdf6a5efeb6595f2da0bf3bdac # shrinks to txid = "000aaaaa00aa00aa00a000a0000aaaaa0aa0a0aa0aa0a00aaa00000a0aaaa0a0", vout = 0, amount = 1000, address_suffix = "0aa00a00aa"
+cc af4b0df2ef29e9f96f69a82feb1942480085a9218067b7d45796006699a33101 # shrinks to txid = "0aa00000aaa0aaaa0a0a00aaaaaaa0aa0000000a0a000a000aaaa0a0aa0a00a0", vout = 0, amount = 1000, address_suffix = "000aaa0000"
+cc 348ace790def62935fe9365dbe7f18881c5dd5163270fb5151f63e7459ddc5f6 # shrinks to txid = "00a000a000a00aa000a0a000000aa0a000a0a00aa00a0a00a0a0aaaaa00000a0", vout = 0, amount = 1000, address_suffix = "aaa0aaaaaa"

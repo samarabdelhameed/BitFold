@@ -14,7 +14,7 @@
     - Return verification result
     - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-  - [ ]* 2.2 Write property test for UTXO verification
+  - [x] 2.2 Write property test for UTXO verification
     - **Property 1: UTXO verification calls Bitcoin API**
     - **Property 2: Only unspent UTXOs are accepted**
     - **Property 3: UTXO amount must match**
@@ -38,7 +38,7 @@
     - Test error handling for API failures
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [-] 3. Implement Ordinals indexer integration
+- [x] 3. Implement Ordinals indexer integration
   - [x] 3.1 Implement `verify_ordinal()` using HTTP outcalls to Maestro API
     - Create HTTP request to Maestro API endpoint
     - Parse JSON response for inscription data
@@ -46,18 +46,18 @@
     - Handle API errors and timeouts
     - _Requirements: 3.1, 3.2, 3.3_
 
-  - [ ]* 3.2 Write property test for Ordinals verification
+  - [x] 3.2 Write property test for Ordinals verification
     - **Property 6: Ordinals indexer is queried for all deposits**
     - **Property 7: Inscription metadata is stored when found**
     - **Property 8: UTXOs without inscriptions are accepted**
     - **Validates: Requirements 3.1, 3.2, 3.3**
 
-  - [ ] 3.3 Implement `get_inscription_metadata()` function
+  - [x] 3.3 Implement `get_inscription_metadata()` function
     - Query Maestro API for detailed inscription metadata
     - Parse and return OrdinalInfo
     - _Requirements: 3.2_
 
-  - [ ]* 3.4 Write unit tests for Ordinals integration
+  - [x] 3.4 Write unit tests for Ordinals integration
     - Test inscription verification with valid inscription
     - Test handling of non-inscription UTXOs
     - Test error handling for indexer failures

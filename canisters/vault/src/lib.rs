@@ -2,12 +2,12 @@
 // This canister manages Bitcoin UTXO collateral and ckBTC loans
 
 mod api;
-mod bitcoin;
+pub mod bitcoin;
 mod ckbtc;
 mod helpers;
-mod ordinals;
+pub mod ordinals;
 mod state;
-mod types;
+pub mod types;
 
 // Re-export API functions
 pub use api::*;
