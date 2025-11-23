@@ -2,8 +2,8 @@ import { HttpAgent, Actor } from '@dfinity/agent';
 import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
 
-// Canister IDs
-const VAULT_CANISTER_ID = 'bkyz2-fmaaa-aaaaa-qaaaq-cai';
+// Canister IDs - Use environment variable or fallback to local
+const VAULT_CANISTER_ID = import.meta.env.VITE_VAULT_CANISTER_ID || 'bkyz2-fmaaa-aaaaa-qaaaq-cai';
 
 // Determine host based on environment
 const HOST = import.meta.env.VITE_DFX_NETWORK === 'ic' 

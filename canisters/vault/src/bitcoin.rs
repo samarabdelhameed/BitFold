@@ -10,7 +10,18 @@ use ic_cdk::api::management_canister::bitcoin::{
 /// 2. UTXO is unspent
 /// 3. UTXO amount matches
 /// 4. UTXO address matches
+/// 
+/// Set SKIP_BITCOIN_VERIFICATION=true to skip verification (for testing without cycles)
 pub async fn verify_utxo(utxo: &UTXO) -> Result<bool, String> {
+    // Feature flag: Skip Bitcoin verification if cycles not available
+    // WARNING: Only use for testing! Remove in production!
+    const SKIP_BITCOIN_VERIFICATION: bool = false; // Set to true to skip verification
+    
+    if SKIP_BITCOIN_VERIFICATION {
+        ic_cdk::println!("⚠️  WARNING: Bitcoin verification SKIPPED (testing mode)");
+        ic_cdk::println!("✅ Assuming UTXO is valid: {}:{} ({} sats)", utxo.txid, utxo.vout, utxo.amount);
+        return Ok(true);
+    }
     // Get UTXOs for the address from Bitcoin network
     let utxos = get_utxos_for_address(&utxo.address, 1).await?;
     
@@ -53,10 +64,18 @@ pub async fn get_utxos_for_address(address: &str, _min_confirmations: u32) -> Re
         filter: None,
     };
     
-    // Call ICP Bitcoin API
-    let response: (GetUtxosResponse,) = bitcoin_get_utxos(request)
-        .await
-        .map_err(|e| format!("Bitcoin API call failed: {:?}", e))?;
+    // Call ICP Bitcoin API with cycles
+    // Bitcoin API requires 4 billion cycles per call
+    let cycles = 4_000_000_000u128;
+    let bitcoin_canister = candid::Principal::from_text("g4xu7-jiaaa-aaaan-aaaaq-cai").unwrap();
+    let response: (GetUtxosResponse,) = ic_cdk::api::call::call_with_payment128(
+        bitcoin_canister,
+        "bitcoin_get_utxos",
+        (request,),
+        cycles,
+    )
+    .await
+    .map_err(|e| format!("Bitcoin API call failed: {:?}", e))?;
     
     ic_cdk::println!("✅ Found {} UTXOs for address", response.0.utxos.len());
     

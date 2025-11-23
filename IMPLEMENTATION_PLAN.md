@@ -1,168 +1,168 @@
-# خطة التنفيذ الكاملة - BitFold BTC Ordinals Smart Vault
+# Complete Implementation Plan - BitFold BTC Ordinals Smart Vault
 
-## 📋 ملخص الوضع الحالي
+## 📋 Current Status Summary
 
-### ✅ ما تم إنجازه:
+### ✅ What Has Been Completed:
 
-1. **البنية الأساسية**:
+1. **Basic Structure**:
 
-   - Canisters منظمة (vault, indexer_stub, governance)
-   - Frontend React كامل مع جميع الصفحات
-   - Types و State management جاهزين
-   - API endpoints محددة في `api.rs`
+   - Organized canisters (vault, indexer_stub, governance)
+   - Complete React frontend with all pages
+   - Types and State management ready
+   - API endpoints defined in `api.rs`
 
-2. **المشاكل الموجودة**:
-   - `lib.rs` في vault يستخدم كود قديم بسيط بدلاً من الملفات المنظمة
-   - وظائف Bitcoin/ckBTC/Ordinals كلها mock (TODO)
-   - Frontend غير متصل بالـ canisters فعلياً
-   - لا يوجد تكامل مع ICP Bitcoin API
-   - لا يوجد تكامل مع ckBTC ledger
-
----
-
-## 🎯 خطة التنفيذ - خطوة بخطوة
-
-### **المرحلة 1: إصلاح البنية الأساسية للـ Vault Canister** (يوم 1)
-
-#### الخطوة 1.1: تحديث `lib.rs` لاستخدام الملفات المنظمة
-
-- حذف الكود القديم من `lib.rs`
-- استيراد واستخدام `api.rs`, `types.rs`, `state.rs`
-- التأكد من أن جميع الـ modules متصلة بشكل صحيح
-
-#### الخطوة 1.2: تحديث `Cargo.toml` لإضافة dependencies المطلوبة
-
-- إضافة `ic-bitcoin` أو `ic-cdk` للـ Bitcoin API
-- إضافة `icrc-ledger` للـ ckBTC
-- إضافة أي dependencies أخرى مطلوبة
-
-#### الخطوة 1.3: اختبار البنية الأساسية
-
-- `dfx build` للتأكد من عدم وجود أخطاء
-- `dfx deploy` للتأكد من أن الـ canister يعمل
+2. **Existing Issues**:
+   - `lib.rs` in vault uses old simple code instead of organized files
+   - Bitcoin/ckBTC/Ordinals functions are all mock (TODO)
+   - Frontend is not actually connected to canisters
+   - No integration with ICP Bitcoin API
+   - No integration with ckBTC ledger
 
 ---
 
-### **المرحلة 2: تنفيذ Bitcoin Integration** (يوم 1-2)
+## 🎯 Implementation Plan - Step by Step
 
-#### الخطوة 2.1: تنفيذ `bitcoin.rs` - التحقق من UTXO
+### **Phase 1: Fix Basic Structure of Vault Canister** (Day 1)
+
+#### Step 1.1: Update `lib.rs` to Use Organized Files
+
+- Delete old code from `lib.rs`
+- Import and use `api.rs`, `types.rs`, `state.rs`
+- Ensure all modules are connected correctly
+
+#### Step 1.2: Update `Cargo.toml` to Add Required Dependencies
+
+- Add `ic-bitcoin` or `ic-cdk` for Bitcoin API
+- Add `icrc-ledger` for ckBTC
+- Add any other required dependencies
+
+#### Step 1.3: Test Basic Structure
+
+- `dfx build` to ensure no errors
+- `dfx deploy` to ensure the canister works
+
+---
+
+### **Phase 2: Implement Bitcoin Integration** (Day 1-2)
+
+#### Step 2.1: Implement `bitcoin.rs` - UTXO Verification
 
 ```rust
-// استخدام ICP Bitcoin API
+// Use ICP Bitcoin API
 use ic_btc_types::*;
 use ic_cdk::api::management_canister::bitcoin::*;
 
-// وظيفة verify_utxo:
-// 1. استدعاء get_utxos للحصول على UTXOs
-// 2. التحقق من وجود UTXO المطلوب
-// 3. التحقق من أن UTXO غير مستهلك
-// 4. التحقق من المبلغ والعنوان
+// verify_utxo function:
+// 1. Call get_utxos to get UTXOs
+// 2. Verify the required UTXO exists
+// 3. Verify UTXO is not spent
+// 4. Verify amount and address
 ```
 
-#### الخطوة 2.2: إضافة وظائف Bitcoin إضافية
+#### Step 2.2: Add Additional Bitcoin Functions
 
-- `get_utxos_for_address()` - للحصول على جميع UTXOs لعنوان
-- `wait_for_confirmation()` - انتظار تأكيد المعاملة
-- `check_utxo_spent()` - التحقق من أن UTXO لم يُستهلك
+- `get_utxos_for_address()` - Get all UTXOs for an address
+- `wait_for_confirmation()` - Wait for transaction confirmation
+- `check_utxo_spent()` - Verify UTXO hasn't been spent
 
-#### الخطوة 2.3: اختبار Bitcoin Integration
+#### Step 2.3: Test Bitcoin Integration
 
-- اختبار على Bitcoin testnet
-- التحقق من أن UTXO verification يعمل
+- Test on Bitcoin testnet
+- Verify UTXO verification works
 
 ---
 
-### **المرحلة 3: تنفيذ Ordinals Indexer Integration** (يوم 2)
+### **Phase 3: Implement Ordinals Indexer Integration** (Day 2)
 
-#### الخطوة 3.1: تنفيذ `ordinals.rs` - التحقق من Ordinals
+#### Step 3.1: Implement `ordinals.rs` - Ordinals Verification
 
 ```rust
-// خيار 1: استخدام Maestro API (HTTP outcall)
-// خيار 2: استخدام indexer canister محلي
-// خيار 3: Mock indexer للـ dev/test
+// Option 1: Use Maestro API (HTTP outcall)
+// Option 2: Use local indexer canister
+// Option 3: Mock indexer for dev/test
 
-// وظيفة verify_ordinal:
-// 1. استدعاء indexer للتحقق من inscription
-// 2. جلب metadata (content_type, content_preview)
-// 3. التحقق من provenance
+// verify_ordinal function:
+// 1. Call indexer to verify inscription
+// 2. Fetch metadata (content_type, content_preview)
+// 3. Verify provenance
 ```
 
-#### الخطوة 3.2: تحديث `indexer_stub` canister
+#### Step 3.2: Update `indexer_stub` Canister
 
-- إضافة وظائف mock للـ Ordinals verification
-- إضافة بيانات تجريبية للاختبار
+- Add mock functions for Ordinals verification
+- Add test data for testing
 
-#### الخطوة 3.3: اختبار Ordinals Integration
+#### Step 3.3: Test Ordinals Integration
 
-- اختبار مع Ordinal حقيقي على testnet
-- التحقق من جلب metadata بشكل صحيح
+- Test with real Ordinal on testnet
+- Verify metadata fetching works correctly
 
 ---
 
-### **المرحلة 4: تنفيذ ckBTC Integration** (يوم 2-3)
+### **Phase 4: Implement ckBTC Integration** (Day 2-3)
 
-#### الخطوة 4.1: تنفيذ `ckbtc.rs` - Mint/Burn/Transfer
+#### Step 4.1: Implement `ckbtc.rs` - Mint/Burn/Transfer
 
 ```rust
-// استخدام ICRC-1 interface للـ ckBTC ledger
+// Use ICRC-1 interface for ckBTC ledger
 use icrc_ledger_types::*;
 
-// وظيفة mint_ckbtc:
-// 1. استدعاء ckBTC minter canister
-// 2. Mint ckBTC للمستخدم
-// 3. التحقق من النجاح
+// mint_ckbtc function:
+// 1. Call ckBTC minter canister
+// 2. Mint ckBTC to user
+// 3. Verify success
 
-// وظيفة burn_ckbtc:
-// 1. التحقق من أن المستخدم أرسل ckBTC للـ canister
-// 2. استدعاء burn على ledger
-// 3. تحديث حالة القرض
+// burn_ckbtc function:
+// 1. Verify user sent ckBTC to canister
+// 2. Call burn on ledger
+// 3. Update loan state
 ```
 
-#### الخطوة 4.2: إضافة ckBTC Balance Checking
+#### Step 4.2: Add ckBTC Balance Checking
 
-- وظيفة للتحقق من رصيد ckBTC للمستخدم
-- وظيفة للتحقق من رصيد الـ canister
+- Function to check user's ckBTC balance
+- Function to check canister balance
 
-#### الخطوة 4.3: اختبار ckBTC Integration
+#### Step 4.3: Test ckBTC Integration
 
-- اختبار على ckBTC dev ledger
-- التحقق من mint/burn/transfer
-
----
-
-### **المرحلة 5: إكمال API Functions** (يوم 3)
-
-#### الخطوة 5.1: مراجعة وتحديث `api.rs`
-
-- التأكد من أن جميع الـ functions تستخدم Bitcoin/ckBTC/Ordinals integrations
-- إضافة error handling شامل
-- إضافة validation للـ inputs
-
-#### الخطوة 5.2: إضافة وظائف إضافية
-
-- `liquidate_loan()` - للتصفية التلقائية
-- `get_loan_health()` - لحساب health factor
-- `calculate_interest()` - لحساب الفائدة
-
-#### الخطوة 5.3: إضافة Query Functions
-
-- `get_all_loans()` - للحصول على جميع القروض
-- `get_user_stats()` - إحصائيات المستخدم
-- `get_vault_stats()` - إحصائيات الـ vault
+- Test on ckBTC dev ledger
+- Verify mint/burn/transfer
 
 ---
 
-### **المرحلة 6: Frontend Integration** (يوم 4)
+### **Phase 5: Complete API Functions** (Day 3)
 
-#### الخطوة 6.1: إعداد ICP Agent في Frontend
+#### Step 5.1: Review and Update `api.rs`
+
+- Ensure all functions use Bitcoin/ckBTC/Ordinals integrations
+- Add comprehensive error handling
+- Add input validation
+
+#### Step 5.2: Add Additional Functions
+
+- `liquidate_loan()` - For automatic liquidation
+- `get_loan_health()` - Calculate health factor
+- `calculate_interest()` - Calculate interest
+
+#### Step 5.3: Add Query Functions
+
+- `get_all_loans()` - Get all loans
+- `get_user_stats()` - User statistics
+- `get_vault_stats()` - Vault statistics
+
+---
+
+### **Phase 6: Frontend Integration** (Day 4)
+
+#### Step 6.1: Setup ICP Agent in Frontend
 
 ```typescript
-// إضافة @dfinity/agent
-// إعداد connection للـ canisters
-// إنشاء service للـ vault canister
+// Add @dfinity/agent
+// Setup connection to canisters
+// Create service for vault canister
 ```
 
-#### الخطوة 6.2: إنشاء Service Layer
+#### Step 6.2: Create Service Layer
 
 ```typescript
 // services/vaultService.ts
@@ -173,170 +173,170 @@ use icrc_ledger_types::*;
 // - getLoans()
 ```
 
-#### الخطوة 6.3: تحديث الصفحات لاستخدام Services
+#### Step 6.3: Update Pages to Use Services
 
-- `ScanOrdinal.tsx` - استدعاء deposit_utxo
-- `LoanOffer.tsx` - استدعاء borrow
-- `Repay.tsx` - استدعاء repay
-- `Dashboard.tsx` - جلب القروض من canister
-- `Withdraw.tsx` - استدعاء withdraw_collateral
+- `ScanOrdinal.tsx` - Call deposit_utxo
+- `LoanOffer.tsx` - Call borrow
+- `Repay.tsx` - Call repay
+- `Dashboard.tsx` - Fetch loans from canister
+- `Withdraw.tsx` - Call withdraw_collateral
 
-#### الخطوة 6.4: إضافة Wallet Connection
+#### Step 6.4: Add Wallet Connection
 
 - Internet Identity integration
-- Bitcoin wallet connection (اختياري)
-- حفظ Principal في context
+- Bitcoin wallet connection (optional)
+- Store Principal in context
 
 ---
 
-### **المرحلة 7: Testing & Debugging** (يوم 5)
+### **Phase 7: Testing & Debugging** (Day 5)
 
-#### الخطوة 7.1: Unit Tests
+#### Step 7.1: Unit Tests
 
-- اختبار جميع functions في vault canister
-- اختبار helpers و calculations
+- Test all functions in vault canister
+- Test helpers and calculations
 
-#### الخطوة 7.2: Integration Tests
+#### Step 7.2: Integration Tests
 
-- اختبار flow كامل: deposit → borrow → repay → withdraw
-- اختبار error cases
+- Test complete flow: deposit → borrow → repay → withdraw
+- Test error cases
 
-#### الخطوة 7.3: Frontend Testing
+#### Step 7.3: Frontend Testing
 
-- اختبار جميع الصفحات
-- اختبار التكامل مع canisters
-- اختبار error handling في UI
-
----
-
-### **المرحلة 8: Deployment & Demo** (يوم 5-6)
-
-#### الخطوة 8.1: Local Deployment
-
-- `dfx deploy` على local replica
-- اختبار كل شيء يعمل محلياً
-
-#### الخطوة 8.2: Testnet Deployment
-
-- Deploy على ICP testnet
-- اختبار مع Bitcoin testnet
-- اختبار مع ckBTC testnet
-
-#### الخطوة 8.3: إعداد Demo Video
-
-- تسجيل فيديو 3 دقائق
-- عرض flow كامل
-- شرح التقنيات المستخدمة
+- Test all pages
+- Test integration with canisters
+- Test error handling in UI
 
 ---
 
-## 📝 ترتيب التنفيذ الموصى به
+### **Phase 8: Deployment & Demo** (Day 5-6)
 
-### اليوم الأول:
+#### Step 8.1: Local Deployment
 
-1. ✅ إصلاح `lib.rs` وربط جميع الـ modules
-2. ✅ تحديث `Cargo.toml` بإضافة dependencies
-3. ✅ تنفيذ `bitcoin.rs` - UTXO verification
-4. ✅ اختبار Bitcoin integration
+- `dfx deploy` on local replica
+- Test everything works locally
 
-### اليوم الثاني:
+#### Step 8.2: Testnet Deployment
 
-1. ✅ تنفيذ `ordinals.rs` - Ordinals verification
-2. ✅ تحديث `indexer_stub` canister
-3. ✅ تنفيذ `ckbtc.rs` - Mint/Burn
-4. ✅ اختبار ckBTC integration
+- Deploy on ICP testnet
+- Test with Bitcoin testnet
+- Test with ckBTC testnet
 
-### اليوم الثالث:
+#### Step 8.3: Setup Demo Video
 
-1. ✅ إكمال `api.rs` مع جميع integrations
-2. ✅ إضافة error handling شامل
-3. ✅ إضافة query functions إضافية
-4. ✅ Unit tests للـ canister
+- Record 3-minute video
+- Show complete flow
+- Explain technologies used
 
-### اليوم الرابع:
+---
 
-1. ✅ إعداد ICP Agent في frontend
-2. ✅ إنشاء service layer
-3. ✅ تحديث جميع الصفحات
-4. ✅ إضافة wallet connection
+## 📝 Recommended Implementation Order
 
-### اليوم الخامس:
+### Day 1:
+
+1. ✅ Fix `lib.rs` and connect all modules
+2. ✅ Update `Cargo.toml` with dependencies
+3. ✅ Implement `bitcoin.rs` - UTXO verification
+4. ✅ Test Bitcoin integration
+
+### Day 2:
+
+1. ✅ Implement `ordinals.rs` - Ordinals verification
+2. ✅ Update `indexer_stub` canister
+3. ✅ Implement `ckbtc.rs` - Mint/Burn
+4. ✅ Test ckBTC integration
+
+### Day 3:
+
+1. ✅ Complete `api.rs` with all integrations
+2. ✅ Add comprehensive error handling
+3. ✅ Add additional query functions
+4. ✅ Unit tests for canister
+
+### Day 4:
+
+1. ✅ Setup ICP Agent in frontend
+2. ✅ Create service layer
+3. ✅ Update all pages
+4. ✅ Add wallet connection
+
+### Day 5:
 
 1. ✅ Integration tests
 2. ✅ Frontend testing
-3. ✅ Debugging وإصلاح المشاكل
+3. ✅ Debugging and fixing issues
 4. ✅ Local deployment
 
-### اليوم السادس:
+### Day 6:
 
 1. ✅ Testnet deployment
 2. ✅ Final testing
-3. ✅ تسجيل Demo video
-4. ✅ إعداد README و documentation
+3. ✅ Record Demo video
+4. ✅ Setup README and documentation
 
 ---
 
-## 🔧 الملفات التي تحتاج تعديل
+## 🔧 Files That Need Modification
 
 ### Backend (Rust):
 
-1. `canisters/vault/src/lib.rs` - **يحتاج إعادة كتابة كاملة**
-2. `canisters/vault/src/bitcoin.rs` - **تنفيذ فعلي**
-3. `canisters/vault/src/ckbtc.rs` - **تنفيذ فعلي**
-4. `canisters/vault/src/ordinals.rs` - **تنفيذ فعلي**
-5. `canisters/vault/src/api.rs` - **مراجعة وتحديث**
-6. `canisters/vault/src/helpers.rs` - **مراجعة**
-7. `canisters/vault/Cargo.toml` - **إضافة dependencies**
-8. `canisters/indexer_stub/src/lib.rs` - **تحسين mock functions**
+1. `canisters/vault/src/lib.rs` - **Needs complete rewrite**
+2. `canisters/vault/src/bitcoin.rs` - **Actual implementation**
+3. `canisters/vault/src/ckbtc.rs` - **Actual implementation**
+4. `canisters/vault/src/ordinals.rs` - **Actual implementation**
+5. `canisters/vault/src/api.rs` - **Review and update**
+6. `canisters/vault/src/helpers.rs` - **Review**
+7. `canisters/vault/Cargo.toml` - **Add dependencies**
+8. `canisters/indexer_stub/src/lib.rs` - **Improve mock functions**
 
 ### Frontend (TypeScript):
 
-1. `frontend/src/services/vaultService.ts` - **إنشاء جديد**
-2. `frontend/src/contexts/AppContext.tsx` - **إضافة canister connection**
-3. `frontend/src/pages/ScanOrdinal.tsx` - **ربط مع canister**
-4. `frontend/src/pages/LoanOffer.tsx` - **ربط مع canister**
-5. `frontend/src/pages/Repay.tsx` - **ربط مع canister**
-6. `frontend/src/pages/Dashboard.tsx` - **ربط مع canister**
-7. `frontend/src/pages/Withdraw.tsx` - **ربط مع canister**
-8. `frontend/package.json` - **إضافة @dfinity/agent**
+1. `frontend/src/services/vaultService.ts` - **Create new**
+2. `frontend/src/contexts/AppContext.tsx` - **Add canister connection**
+3. `frontend/src/pages/ScanOrdinal.tsx` - **Connect to canister**
+4. `frontend/src/pages/LoanOffer.tsx` - **Connect to canister**
+5. `frontend/src/pages/Repay.tsx` - **Connect to canister**
+6. `frontend/src/pages/Dashboard.tsx` - **Connect to canister**
+7. `frontend/src/pages/Withdraw.tsx` - **Connect to canister**
+8. `frontend/package.json` - **Add @dfinity/agent**
 
 ---
 
-## 🚨 نقاط مهمة للتنفيذ
+## 🚨 Important Implementation Points
 
 ### 1. Bitcoin API Integration:
 
-- استخدام `ic_btc_types` و `ic_cdk::api::management_canister::bitcoin`
-- التأكد من استخدام Bitcoin testnet للاختبار
-- التحقق من confirmations قبل اعتبار UTXO موثوق
+- Use `ic_btc_types` and `ic_cdk::api::management_canister::bitcoin`
+- Ensure using Bitcoin testnet for testing
+- Verify confirmations before considering UTXO trusted
 
 ### 2. ckBTC Integration:
 
-- استخدام ICRC-1 interface
-- الحصول على ckBTC ledger canister ID من testnet
-- التأكد من handle errors بشكل صحيح
+- Use ICRC-1 interface
+- Get ckBTC ledger canister ID from testnet
+- Ensure error handling is correct
 
 ### 3. Ordinals Verification:
 
-- البدء بـ mock indexer للـ dev
-- الانتقال لـ Maestro API أو indexer canister لاحقاً
-- التحقق من inscription_id بشكل صحيح
+- Start with mock indexer for dev
+- Move to Maestro API or indexer canister later
+- Verify inscription_id correctly
 
 ### 4. Error Handling:
 
-- إضافة Result types في جميع functions
-- رسائل خطأ واضحة
-- Logging للأخطاء
+- Add Result types in all functions
+- Clear error messages
+- Logging for errors
 
 ### 5. Security:
 
-- التحقق من caller في جميع update functions
-- التحقق من ownership قبل أي operation
-- Rate limiting (اختياري)
+- Verify caller in all update functions
+- Verify ownership before any operation
+- Rate limiting (optional)
 
 ---
 
-## 📚 موارد للقراءة
+## 📚 Reading Resources
 
 1. **ICP Bitcoin Integration**:
 
@@ -355,30 +355,30 @@ use icrc_ledger_types::*;
 
 ---
 
-## ✅ Checklist قبل التسليم
+## ✅ Pre-Submission Checklist
 
-- [ ] جميع functions في vault canister تعمل
-- [ ] Bitcoin UTXO verification يعمل
-- [ ] Ordinals verification يعمل
-- [ ] ckBTC mint/burn يعمل
-- [ ] Frontend متصل بالـ canisters
-- [ ] جميع الصفحات تعمل
-- [ ] Error handling شامل
-- [ ] Tests موجودة
-- [ ] Documentation كاملة
-- [ ] Demo video جاهز
-- [ ] Deployed على testnet
-
----
-
-## 🎬 ملاحظات نهائية
-
-1. **ابدأ بالبسيط**: نفذ mock functions أولاً، ثم استبدلها بالتنفيذ الفعلي
-2. **اختبر بشكل مستمر**: بعد كل function، اختبرها
-3. **استخدم testnet**: لا تختبر على mainnet
-4. **وثّق كل شيء**: اكتب comments و documentation
-5. **ركز على MVP**: لا تحتاج كل الميزات، فقط الأساسيات للـ demo
+- [ ] All functions in vault canister work
+- [ ] Bitcoin UTXO verification works
+- [ ] Ordinals verification works
+- [ ] ckBTC mint/burn works
+- [ ] Frontend connected to canisters
+- [ ] All pages work
+- [ ] Comprehensive error handling
+- [ ] Tests exist
+- [ ] Complete documentation
+- [ ] Demo video ready
+- [ ] Deployed on testnet
 
 ---
 
-**جاهز للبدء؟ ابدأ بالمرحلة 1! 🚀**
+## 🎬 Final Notes
+
+1. **Start Simple**: Implement mock functions first, then replace with actual implementation
+2. **Test Continuously**: After each function, test it
+3. **Use Testnet**: Don't test on mainnet
+4. **Document Everything**: Write comments and documentation
+5. **Focus on MVP**: You don't need all features, just the basics for the demo
+
+---
+
+**Ready to start? Begin with Phase 1! 🚀**

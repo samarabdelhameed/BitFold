@@ -113,7 +113,7 @@
     - Handle transfer failures properly
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
 
-  - [x]* 5.4 Write property test for borrow
+  - [ ]* 5.4 Write property test for borrow
     - **Property 9: Max borrowable amount calculation**
     - **Property 10: Valid borrow creates loan and locks UTXO**
     - **Property 11: Users can only borrow against owned UTXOs**

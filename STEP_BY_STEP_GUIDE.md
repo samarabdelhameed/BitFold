@@ -1,18 +1,18 @@
-# دليل التنفيذ خطوة بخطوة - BitFold
+# Step-by-Step Implementation Guide - BitFold
 
-## 🎯 الهدف
+## 🎯 Objective
 
-تحويل المشروع من بنية جاهزة إلى تطبيق يعمل بالكامل.
+Transform the project from a ready structure to a fully functional application.
 
 ---
 
-## 📦 الخطوة 1: إصلاح البنية الأساسية
+## 📦 Step 1: Fix Basic Structure
 
-### 1.1 تحديث `lib.rs`
+### 1.1 Update `lib.rs`
 
-**المشكلة الحالية**: `lib.rs` يحتوي على كود قديم بسيط بدلاً من استخدام الملفات المنظمة.
+**Current Issue**: `lib.rs` contains old simple code instead of using organized files.
 
-**الحل**:
+**Solution**:
 
 ```rust
 // canisters/vault/src/lib.rs
@@ -31,17 +31,17 @@ pub use api::*;
 candid::export_candid!();
 ```
 
-**الإجراءات**:
+**Actions**:
 
-1. فتح `canisters/vault/src/lib.rs`
-2. استبدال المحتوى بالكود أعلاه
-3. التأكد من أن جميع الـ modules موجودة
+1. Open `canisters/vault/src/lib.rs`
+2. Replace the content with the code above
+3. Ensure all modules exist
 
 ---
 
-### 1.2 تحديث `Cargo.toml`
+### 1.2 Update `Cargo.toml`
 
-**إضافة dependencies المطلوبة**:
+**Add required dependencies**:
 
 ```toml
 [dependencies]
@@ -49,16 +49,16 @@ ic-cdk = "0.13"
 ic-cdk-macros = "0.13"
 serde = { version = "1.0", features = ["derive"] }
 candid = "0.10"
-# إضافة هذه:
-ic-icrc1-ledger = "0.1.0"  # للـ ckBTC
-# أو استخدام ic_cdk::api::call مباشرة
+# Add these:
+ic-icrc1-ledger = "0.1.0"  # For ckBTC
+# Or use ic_cdk::api::call directly
 ```
 
-**ملاحظة**: للـ Bitcoin API، نستخدم `ic_cdk::api::management_canister::bitcoin` المدمج.
+**Note**: For Bitcoin API, we use the built-in `ic_cdk::api::management_canister::bitcoin`.
 
 ---
 
-### 1.3 اختبار البنية
+### 1.3 Test Structure
 
 ```bash
 cd canisters/vault
@@ -66,16 +66,16 @@ cargo check
 dfx build
 ```
 
-**إذا نجح**: ✅ جاهز للخطوة التالية  
-**إذا فشل**: راجع أخطاء الـ compiler وأصلحها
+**If successful**: ✅ Ready for next step  
+**If failed**: Review compiler errors and fix them
 
 ---
 
-## 🔗 الخطوة 2: تنفيذ Bitcoin Integration
+## 🔗 Step 2: Implement Bitcoin Integration
 
-### 2.1 تحديث `bitcoin.rs`
+### 2.1 Update `bitcoin.rs`
 
-**الكود الكامل**:
+**Full code**:
 
 ```rust
 // canisters/vault/src/bitcoin.rs
@@ -88,10 +88,10 @@ use ic_cdk::api::management_canister::bitcoin::{
     bitcoin_get_utxos, bitcoin_get_current_fee_percentiles,
 };
 
-const BITCOIN_NETWORK: BitcoinNetwork = BitcoinNetwork::Testnet; // أو Mainnet
+const BITCOIN_NETWORK: BitcoinNetwork = BitcoinNetwork::Testnet; // Or Mainnet
 
 pub async fn verify_utxo(utxo: &UTXO) -> Result<bool, String> {
-    // 1. الحصول على UTXOs للعنوان
+    // 1. Get UTXOs for the address
     let request = GetUtxosRequest {
         address: utxo.address.clone(),
         network: BITCOIN_NETWORK,
@@ -103,7 +103,7 @@ pub async fn verify_utxo(utxo: &UTXO) -> Result<bool, String> {
         Ok((response,)) => {
             let GetUtxosResponse { utxos, .. } = response;
 
-            // 2. البحث عن UTXO المطلوب
+            // 2. Search for the required UTXO
             let found = utxos.iter().any(|u| {
                 u.outpoint.txid.to_string() == utxo.txid
                 && u.outpoint.vout == utxo.vout
@@ -113,7 +113,7 @@ pub async fn verify_utxo(utxo: &UTXO) -> Result<bool, String> {
                 return Err("UTXO not found".to_string());
             }
 
-            // 3. التحقق من المبلغ
+            // 3. Verify the amount
             let utxo_data = utxos.iter().find(|u| {
                 u.outpoint.txid.to_string() == utxo.txid
                 && u.outpoint.vout == utxo.vout
@@ -130,36 +130,36 @@ pub async fn verify_utxo(utxo: &UTXO) -> Result<bool, String> {
 }
 
 pub async fn is_utxo_spent(txid: &str, vout: u32) -> Result<bool, String> {
-    // التحقق من أن UTXO لم يُستهلك
-    // يمكن استخدام get_utxos والتحقق من عدم وجوده
-    Ok(false) // TODO: تنفيذ فعلي
+    // Verify that UTXO hasn't been spent
+    // Can use get_utxos and verify it doesn't exist
+    Ok(false) // TODO: Actual implementation
 }
 
 pub async fn get_btc_price() -> Result<u64, String> {
-    // TODO: استخدام price oracle
+    // TODO: Use price oracle
     Ok(50_000_000_000) // Mock
 }
 ```
 
-**الإجراءات**:
+**Actions**:
 
-1. استبدال محتوى `bitcoin.rs` بالكود أعلاه
-2. `cargo check` للتأكد من عدم وجود أخطاء
-3. `dfx build` للبناء
+1. Replace `bitcoin.rs` content with the code above
+2. `cargo check` to ensure no errors
+3. `dfx build` to build
 
 ---
 
-### 2.2 اختبار Bitcoin Integration
+### 2.2 Test Bitcoin Integration
 
-**ملاحظة**: للاختبار على testnet، تحتاج:
+**Note**: For testing on testnet, you need:
 
 - Bitcoin testnet address
-- UTXO على testnet
+- UTXO on testnet
 
-**اختبار بسيط**:
+**Simple test**:
 
 ```rust
-// في tests أو update function
+// In tests or update function
 let utxo = UTXO {
     id: 0,
     txid: "test_txid".to_string(),
@@ -176,11 +176,11 @@ let result = verify_utxo(&utxo).await;
 
 ---
 
-## 🎨 الخطوة 3: تنفيذ Ordinals Integration
+## 🎨 Step 3: Implement Ordinals Integration
 
-### 3.1 تحديث `ordinals.rs`
+### 3.1 Update `ordinals.rs`
 
-**خيار 1: استخدام Mock Indexer (للـ dev)**:
+**Option 1: Use Mock Indexer (for dev)**:
 
 ```rust
 // canisters/vault/src/ordinals.rs
@@ -203,7 +203,7 @@ struct VerifyOrdinalResponse {
 }
 
 pub async fn verify_ordinal(txid: &str, vout: u32) -> Result<Option<OrdinalInfo>, String> {
-    // استدعاء indexer canister
+    // Call indexer canister
     let indexer_principal = Principal::from_text(INDEXER_CANISTER_ID)
         .map_err(|e| format!("Invalid principal: {:?}", e))?;
 
@@ -228,7 +228,7 @@ pub async fn verify_ordinal(txid: &str, vout: u32) -> Result<Option<OrdinalInfo>
             }
         }
         Err(e) => {
-            // Fallback: mock response للـ dev
+            // Fallback: mock response for dev
             ic_cdk::println!("Indexer call failed: {:?}, using mock", e);
             Ok(Some(OrdinalInfo {
                 inscription_id: format!("{}:{}", txid, vout),
@@ -241,7 +241,7 @@ pub async fn verify_ordinal(txid: &str, vout: u32) -> Result<Option<OrdinalInfo>
 }
 
 pub async fn get_ordinal_metadata(inscription_id: &str) -> Result<OrdinalInfo, String> {
-    // TODO: تنفيذ فعلي
+    // TODO: Actual implementation
     Ok(OrdinalInfo {
         inscription_id: inscription_id.to_string(),
         content_type: "image/png".to_string(),
@@ -251,22 +251,22 @@ pub async fn get_ordinal_metadata(inscription_id: &str) -> Result<OrdinalInfo, S
 }
 ```
 
-**خيار 2: استخدام Maestro API (HTTP Outcall)**:
+**Option 2: Use Maestro API (HTTP Outcall)**:
 
 ```rust
-// يمكن استخدام HTTP outcall للاتصال بـ Maestro API
-// لكن هذا يتطلب إعداد أكثر تعقيداً
+// Can use HTTP outcall to connect to Maestro API
+// But this requires more complex setup
 ```
 
-**الإجراءات**:
+**Actions**:
 
-1. استبدال `ordinals.rs` بالكود أعلاه
-2. تحديث `indexer_stub` canister لدعم `verify_ordinal`
-3. `cargo check` و `dfx build`
+1. Replace `ordinals.rs` with the code above
+2. Update `indexer_stub` canister to support `verify_ordinal`
+3. `cargo check` and `dfx build`
 
 ---
 
-### 3.2 تحديث `indexer_stub` Canister
+### 3.2 Update `indexer_stub` Canister
 
 ```rust
 // canisters/indexer_stub/src/lib.rs
@@ -312,9 +312,9 @@ candid::export_candid!();
 
 ---
 
-## 💰 الخطوة 4: تنفيذ ckBTC Integration
+## 💰 Step 4: Implement ckBTC Integration
 
-### 4.1 تحديث `ckbtc.rs`
+### 4.1 Update `ckbtc.rs`
 
 ```rust
 // canisters/vault/src/ckbtc.rs
@@ -339,19 +339,19 @@ struct TransferResult {
 }
 
 pub async fn mint_ckbtc(to: Principal, amount: u64) -> Result<u64, String> {
-    // ملاحظة: ckBTC minting يتم عبر minter canister
-    // لكن للتبسيط، سنستخدم ledger مباشرة
+    // Note: ckBTC minting is done via minter canister
+    // But for simplicity, we'll use ledger directly
 
     let ledger_principal = Principal::from_text(CKBTC_LEDGER_CANISTER_ID)
         .map_err(|e| format!("Invalid principal: {:?}", e))?;
 
-    // في الواقع، ckBTC minting يحتاج minter canister
-    // لكن للـ demo، يمكن mock هذا
+    // Actually, ckBTC minting needs minter canister
+    // But for demo, we can mock this
 
     ic_cdk::println!("Minting {} satoshis of ckBTC to {}", amount, to);
 
-    // TODO: استدعاء minter canister
-    // للآن، نعيد success
+    // TODO: Call minter canister
+    // For now, return success
     Ok(amount)
 }
 
@@ -359,8 +359,8 @@ pub async fn burn_ckbtc(from: Principal, amount: u64) -> Result<u64, String> {
     // Burn ckBTC
     ic_cdk::println!("Burning {} satoshis of ckBTC from {}", amount, from);
 
-    // TODO: التحقق من أن from أرسل ckBTC للـ canister
-    // ثم استدعاء burn
+    // TODO: Verify that from sent ckBTC to the canister
+    // Then call burn
 
     Ok(amount)
 }
@@ -397,32 +397,32 @@ pub async fn get_ckbtc_balance(principal: Principal) -> Result<u64, String> {
     let ledger_principal = Principal::from_text(CKBTC_LEDGER_CANISTER_ID)
         .map_err(|e| format!("Invalid principal: {:?}", e))?;
 
-    // TODO: استدعاء balance_of
+    // TODO: Call balance_of
     Ok(0)
 }
 ```
 
-**ملاحظة مهمة**:
+**Important note**:
 
-- للـ demo، يمكن استخدام mock functions
-- للـ production، تحتاج تكامل كامل مع ckBTC minter/ledger
+- For demo, can use mock functions
+- For production, need full integration with ckBTC minter/ledger
 
 ---
 
-## 🔧 الخطوة 5: إكمال API Functions
+## 🔧 Step 5: Complete API Functions
 
-### 5.1 مراجعة `api.rs`
+### 5.1 Review `api.rs`
 
-**تأكد من**:
+**Ensure**:
 
-1. جميع functions تستخدم Bitcoin/ckBTC/Ordinals integrations
-2. Error handling شامل
-3. Validation للـ inputs
+1. All functions use Bitcoin/ckBTC/Ordinals integrations
+2. Comprehensive error handling
+3. Input validation
 
-**مثال على function محدثة**:
+**Example of updated function**:
 
 ```rust
-// في api.rs - deposit_utxo
+// In api.rs - deposit_utxo
 pub async fn deposit_utxo(request: DepositUtxoRequest) -> Result<UtxoId, String> {
     let caller = msg_caller();
 
@@ -485,18 +485,18 @@ pub async fn deposit_utxo(request: DepositUtxoRequest) -> Result<UtxoId, String>
 
 ---
 
-## 🎨 الخطوة 6: Frontend Integration
+## 🎨 Step 6: Frontend Integration
 
-### 6.1 إعداد ICP Agent
+### 6.1 Setup ICP Agent
 
-**تثبيت dependencies**:
+**Install dependencies**:
 
 ```bash
 cd frontend
 npm install @dfinity/agent @dfinity/auth-client @dfinity/identity
 ```
 
-**إنشاء service**:
+**Create service**:
 
 ```typescript
 // frontend/src/services/vaultService.ts
@@ -515,7 +515,7 @@ export class VaultService {
       host: process.env.VITE_ICP_HOST || "http://localhost:4943",
     });
 
-    // للـ local development
+    // For local development
     if (process.env.NODE_ENV === "development") {
       await this.agent.fetchRootKey();
     }
@@ -560,14 +560,14 @@ export class VaultService {
 export const vaultService = new VaultService();
 ```
 
-### 6.2 تحديث `AppContext.tsx`
+### 6.2 Update `AppContext.tsx`
 
 ```typescript
-// إضافة في AppContext
+// Add in AppContext
 import { vaultService } from "../services/vaultService";
 import { AuthClient } from "@dfinity/auth-client";
 
-// في AppProvider
+// In AppProvider
 const [authClient, setAuthClient] = useState<AuthClient | null>(null);
 
 useEffect(() => {
@@ -580,9 +580,9 @@ useEffect(() => {
 }, []);
 ```
 
-### 6.3 تحديث الصفحات
+### 6.3 Update Pages
 
-**مثال: `ScanOrdinal.tsx`**:
+**Example: `ScanOrdinal.tsx`**:
 
 ```typescript
 const handleScan = async () => {
@@ -618,7 +618,7 @@ const handleScan = async () => {
 
 ---
 
-## ✅ الخطوة 7: Testing
+## ✅ Step 7: Testing
 
 ### 7.1 Unit Tests
 
@@ -657,7 +657,7 @@ async fn test_deposit_borrow_repay_flow() {
 
 ---
 
-## 🚀 الخطوة 8: Deployment
+## 🚀 Step 8: Deployment
 
 ### 8.1 Local Deployment
 
@@ -674,19 +674,20 @@ dfx deploy --network ic
 
 ---
 
-## 📝 Checklist نهائي
+## 📝 Final Checklist
 
-- [ ] `lib.rs` محدث
-- [ ] `Cargo.toml` به dependencies
-- [ ] `bitcoin.rs` يعمل
-- [ ] `ordinals.rs` يعمل
-- [ ] `ckbtc.rs` يعمل
-- [ ] `api.rs` مكتمل
-- [ ] Frontend متصل
-- [ ] جميع الصفحات تعمل
-- [ ] Tests موجودة
-- [ ] Deployed على testnet
+- [ ] `lib.rs` updated
+- [ ] `Cargo.toml` has dependencies
+- [ ] `bitcoin.rs` works
+- [ ] `ordinals.rs` works
+- [ ] `ckbtc.rs` works
+- [ ] `api.rs` complete
+- [ ] Frontend connected
+- [ ] All pages work
+- [ ] Tests exist
+- [ ] Deployed on testnet
 
 ---
 
-**ابدأ الآن! 🚀**
+**Start now! 🚀**
+
