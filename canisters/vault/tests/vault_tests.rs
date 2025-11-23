@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use vault::helpers::calculate_max_borrowable;
+    use vault::types::{UTXO, UtxoStatus};
 
     #[test]
     fn test_deposit_utxo() {
@@ -29,9 +30,6 @@ mod tests {
     #[test]
     fn test_ltv_calculation() {
         // Test LTV calculation
-        use crate::helpers::calculate_max_borrowable;
-        use crate::types::{UTXO, UtxoStatus};
-
         let utxo = UTXO {
             id: 1,
             txid: "test".to_string(),

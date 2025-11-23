@@ -3,8 +3,8 @@
 
 mod api;
 pub mod bitcoin;
-mod ckbtc;
-mod helpers;
+pub mod ckbtc;
+pub mod helpers;
 pub mod ordinals;
 mod state;
 pub mod types;

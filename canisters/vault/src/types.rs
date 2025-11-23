@@ -71,3 +71,51 @@ pub struct RepayRequest {
     pub amount: u64,  // in satoshis
 }
 
+
+
+// ============================================================================
+// Additional Types for Vault Management (Task 10)
+// ============================================================================
+
+/// Loan health information
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+pub struct LoanHealth {
+    pub loan_id: LoanId,
+    pub current_ltv: u64,              // Current LTV in basis points
+    pub liquidation_threshold: u64,     // Liquidation threshold in basis points
+    pub health_factor: u64,             // Health factor (100 = 1.0)
+    pub can_be_liquidated: bool,        // Whether loan can be liquidated
+    pub collateral_value: u64,          // Collateral value in satoshis
+    pub loan_value: u64,                // Current loan value in satoshis
+}
+
+/// User statistics
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+pub struct UserStats {
+    pub total_collateral_value: u64,   // Total collateral in satoshis
+    pub total_borrowed: u64,            // Total borrowed amount
+    pub total_debt: u64,                // Total debt (borrowed + interest - repaid)
+    pub active_loans_count: u64,        // Number of active loans
+    pub total_utxos_count: u64,         // Number of UTXOs
+    pub average_ltv: u64,               // Average LTV in basis points
+}
+
+/// Vault statistics
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+pub struct VaultStats {
+    pub total_value_locked: u64,       // Total value locked in satoshis
+    pub total_loans_outstanding: u64,   // Total loans outstanding
+    pub active_loans_count: u64,        // Number of active loans
+    pub total_users: u64,               // Number of unique users
+    pub total_utxos: u64,               // Total number of UTXOs
+    pub utilization_rate: u64,          // Utilization rate in basis points
+}
+
+/// Paginated loans response
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+pub struct LoansPage {
+    pub loans: Vec<Loan>,
+    pub total: u64,
+    pub offset: u64,
+    pub limit: u64,
+}

@@ -22,19 +22,27 @@ struct MaestroInscriptionResponse {
 
 /// Verifies an Ordinal inscription exists
 pub async fn verify_ordinal(txid: &str, vout: u32) -> Result<Option<OrdinalInfo>, String> {
-    // TODO: Implement actual indexer call
-    // This would call the Ordinals indexer canister to verify:
-    // 1. Inscription exists for this UTXO
-    // 2. Get inscription metadata
-    // 3. Get content preview if available
+    // Construct inscription ID from txid and vout
+    let inscription_id = format!("{}i{}", txid, vout);
     
-    // Mock implementation
-    Ok(Some(OrdinalInfo {
-        inscription_id: format!("{}:{}", txid, vout),
-        content_type: "image/png".to_string(),
-        content_preview: None,
-        metadata: None,
-    }))
+    // Try to get inscription metadata from Maestro API
+    match get_inscription_metadata(&inscription_id).await {
+        Ok(ordinal_info) => {
+            ic_cdk::println!("Found inscription: {}", inscription_id);
+            Ok(Some(ordinal_info))
+        }
+        Err(e) => {
+            // If inscription not found or API error, treat as regular UTXO
+            // Only return error if it's a critical API failure
+            if e.contains("HTTP request failed") {
+                return Err(format!("Ordinals indexer unavailable: {}", e));
+            }
+            
+            // 404 or inscription not found - this is OK, just means no inscription
+            ic_cdk::println!("No inscription found for {}:{}, treating as regular UTXO", txid, vout);
+            Ok(None)
+        }
+    }
 }
 
 /// Gets detailed inscription metadata from Maestro API

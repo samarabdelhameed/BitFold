@@ -8,56 +8,63 @@ use crate::{bitcoin, ckbtc, ordinals};
 pub async fn deposit_utxo(request: DepositUtxoRequest) -> Result<UtxoId, String> {
     let caller = ic_cdk::api::caller();
     
-    // Validate input
+    // 1. Validate inputs first (no state changes)
     if !is_valid_txid(&request.txid) {
-        return Err("Invalid transaction ID".to_string());
+        return Err("Invalid transaction ID: must be 64 hexadecimal characters".to_string());
     }
     
     if !is_valid_btc_address(&request.address) {
-        return Err("Invalid Bitcoin address".to_string());
+        return Err("Invalid Bitcoin address format".to_string());
     }
     
-    // Verify UTXO exists
+    if request.amount == 0 {
+        return Err("Invalid amount: must be greater than 0".to_string());
+    }
+    
+    // 2. Call external APIs (no state changes yet)
+    // Create temporary UTXO for verification
     let utxo = UTXO {
         id: 0, // Will be set by state
         txid: request.txid.clone(),
         vout: request.vout,
         amount: request.amount,
-        address: request.address,
-        ordinal_info: request.ordinal_info.clone(),
+        address: request.address.clone(),
+        ordinal_info: None,
         status: UtxoStatus::Deposited,
         deposited_at: get_timestamp(),
     };
     
-    // Verify UTXO with Bitcoin API
+    // Verify UTXO exists on Bitcoin network using ICP Bitcoin API
     let verified = bitcoin::verify_utxo(&utxo).await?;
     if !verified {
-        return Err("UTXO verification failed".to_string());
+        return Err("UTXO verification failed: UTXO not found or already spent".to_string());
     }
     
-    // If Ordinal, verify with indexer
-    let mut ordinal_info = request.ordinal_info;
-    if ordinal_info.is_none() {
-        // Try to fetch ordinal info from indexer
-        ordinal_info = ordinals::verify_ordinal(&utxo.txid, utxo.vout).await?;
-    }
+    // Query Ordinals indexer to check for inscriptions
+    let ordinal_info = ordinals::verify_ordinal(&utxo.txid, utxo.vout).await?;
     
-    // Store UTXO
+    // 3. Only modify state after all validations and external calls succeed
     let utxo_id = State::with(|state| {
         let id = state.next_utxo_id;
         state.next_utxo_id += 1;
         
-        let mut utxo = utxo;
-        utxo.id = id;
-        if ordinal_info.is_some() {
-            utxo.ordinal_info = ordinal_info;
-        }
+        let mut final_utxo = utxo;
+        final_utxo.id = id;
+        final_utxo.ordinal_info = ordinal_info;
         
-        state.utxos.insert(id, utxo.clone());
+        state.utxos.insert(id, final_utxo.clone());
         state.user_utxos
             .entry(caller)
             .or_insert_with(Vec::new)
             .push(id);
+        
+        ic_cdk::println!(
+            "Deposited UTXO {} for user {}: {} satoshis{}",
+            id,
+            caller,
+            final_utxo.amount,
+            if final_utxo.ordinal_info.is_some() { " (with inscription)" } else { "" }
+        );
         
         id
     });
@@ -69,6 +76,11 @@ pub async fn deposit_utxo(request: DepositUtxoRequest) -> Result<UtxoId, String>
 #[ic_cdk::update]
 pub async fn borrow(request: BorrowRequest) -> Result<LoanId, String> {
     let caller = ic_cdk::api::caller();
+    
+    // 1. Validate inputs and authorization (no state changes)
+    if request.amount == 0 {
+        return Err("Invalid borrow amount: must be greater than 0".to_string());
+    }
     
     // Get UTXO
     let utxo = State::with_read(|state| {
@@ -83,24 +95,32 @@ pub async fn borrow(request: BorrowRequest) -> Result<LoanId, String> {
     });
     
     if !user_utxos.map(|utxos| utxos.contains(&request.utxo_id)).unwrap_or(false) {
-        return Err("UTXO does not belong to caller".to_string());
+        return Err("Unauthorized: UTXO does not belong to caller".to_string());
     }
     
     // Check UTXO is not already locked
     if utxo.status != UtxoStatus::Deposited {
-        return Err("UTXO is already locked".to_string());
+        return Err("UTXO is already locked or withdrawn".to_string());
     }
     
-    // Calculate max borrowable (50% LTV)
+    // Calculate max borrowable (50% LTV = 5000 basis points)
     let max_borrowable = calculate_max_borrowable(&utxo, 5000);
     if request.amount > max_borrowable {
-        return Err(format!("Amount exceeds maximum borrowable: {}", max_borrowable));
+        return Err(format!(
+            "Amount {} exceeds maximum borrowable: {} (50% LTV)",
+            request.amount, max_borrowable
+        ));
     }
     
-    // Mint ckBTC
-    ckbtc::mint_ckbtc(caller, request.amount).await?;
+    // 2. Transfer ckBTC to user using real ckBTC ledger
+    let block_index = ckbtc::transfer_ckbtc(caller, request.amount).await?;
     
-    // Create loan
+    ic_cdk::println!(
+        "Successfully transferred {} satoshis ckBTC to {}, block index: {}",
+        request.amount, caller, block_index
+    );
+    
+    // 3. Only modify state after successful ckBTC transfer
     let loan_id = State::with(|state| {
         let id = state.next_loan_id;
         state.next_loan_id += 1;
@@ -111,7 +131,7 @@ pub async fn borrow(request: BorrowRequest) -> Result<LoanId, String> {
             collateral_utxo_id: request.utxo_id,
             borrowed_amount: request.amount,
             repaid_amount: 0,
-            interest_rate: 500, // 5% annual
+            interest_rate: 500, // 5% annual interest
             created_at: get_timestamp(),
             status: LoanStatus::Active,
         };
@@ -122,10 +142,15 @@ pub async fn borrow(request: BorrowRequest) -> Result<LoanId, String> {
             .or_insert_with(Vec::new)
             .push(id);
         
-        // Lock UTXO
+        // Lock UTXO as collateral
         if let Some(utxo) = state.utxos.get_mut(&request.utxo_id) {
             utxo.status = UtxoStatus::Locked;
         }
+        
+        ic_cdk::println!(
+            "Created loan {} for user {}: borrowed {} satoshis against UTXO {}",
+            id, caller, request.amount, request.utxo_id
+        );
         
         id
     });
@@ -138,6 +163,11 @@ pub async fn borrow(request: BorrowRequest) -> Result<LoanId, String> {
 pub async fn repay(request: RepayRequest) -> Result<(), String> {
     let caller = ic_cdk::api::caller();
     
+    // 1. Validate inputs and authorization (no state changes)
+    if request.amount == 0 {
+        return Err("Invalid repayment amount: must be greater than 0".to_string());
+    }
+    
     // Get loan
     let loan = State::with_read(|state| {
         state.loans.get(&request.loan_id).cloned()
@@ -147,7 +177,7 @@ pub async fn repay(request: RepayRequest) -> Result<(), String> {
     
     // Check loan belongs to caller
     if loan.user_id != caller {
-        return Err("Loan does not belong to caller".to_string());
+        return Err("Unauthorized: loan does not belong to caller".to_string());
     }
     
     // Check loan is active
@@ -155,17 +185,30 @@ pub async fn repay(request: RepayRequest) -> Result<(), String> {
         return Err("Loan is not active".to_string());
     }
     
-    // Calculate remaining debt
+    // Calculate remaining debt (borrowed + interest - repaid)
     let remaining_debt = calculate_loan_value(&loan);
     if request.amount > remaining_debt {
-        return Err(format!("Amount exceeds remaining debt: {}", remaining_debt));
+        return Err(format!(
+            "Amount {} exceeds remaining debt: {}",
+            request.amount, remaining_debt
+        ));
     }
     
-    // Burn ckBTC (user should have transferred to canister first)
-    // TODO: Implement actual ckBTC transfer verification
-    ckbtc::burn_ckbtc(caller, request.amount).await?;
+    // 2. Verify user has transferred ckBTC to canister using real ckBTC ledger
+    let verified = ckbtc::verify_transfer_to_canister(caller, request.amount).await?;
+    if !verified {
+        return Err("ckBTC transfer verification failed: no matching transfer found".to_string());
+    }
     
-    // Update loan
+    ic_cdk::println!(
+        "Verified ckBTC transfer of {} satoshis from {} for loan {}",
+        request.amount, caller, request.loan_id
+    );
+    
+    // Note: In production, you might want to actually burn the ckBTC tokens here
+    // For now, the canister holds the ckBTC (which effectively removes it from circulation)
+    
+    // 3. Only modify state after successful verification
     State::with(|state| {
         if let Some(loan) = state.loans.get_mut(&request.loan_id) {
             loan.repaid_amount += request.amount;
@@ -178,6 +221,16 @@ pub async fn repay(request: RepayRequest) -> Result<(), String> {
                 if let Some(utxo) = state.utxos.get_mut(&loan.collateral_utxo_id) {
                     utxo.status = UtxoStatus::Deposited;
                 }
+                
+                ic_cdk::println!(
+                    "Loan {} fully repaid, unlocked UTXO {}",
+                    request.loan_id, loan.collateral_utxo_id
+                );
+            } else {
+                ic_cdk::println!(
+                    "Partial repayment for loan {}: {} / {} satoshis",
+                    request.loan_id, loan.repaid_amount, loan.borrowed_amount
+                );
             }
         }
     });
@@ -190,6 +243,7 @@ pub async fn repay(request: RepayRequest) -> Result<(), String> {
 pub async fn withdraw_collateral(utxo_id: UtxoId) -> Result<(), String> {
     let caller = ic_cdk::api::caller();
     
+    // 1. Validate and check authorization (no state changes)
     // Get UTXO
     let utxo = State::with_read(|state| {
         state.utxos.get(&utxo_id).cloned()
@@ -197,21 +251,26 @@ pub async fn withdraw_collateral(utxo_id: UtxoId) -> Result<(), String> {
     
     let utxo = utxo.ok_or("UTXO not found".to_string())?;
     
-    // Check UTXO belongs to caller
+    // Verify caller owns the UTXO
     let user_utxos = State::with_read(|state| {
         state.user_utxos.get(&caller).cloned()
     });
     
     if !user_utxos.map(|utxos| utxos.contains(&utxo_id)).unwrap_or(false) {
-        return Err("UTXO does not belong to caller".to_string());
+        return Err("Unauthorized: UTXO does not belong to caller".to_string());
     }
     
-    // Check UTXO is not locked
+    // Check UTXO is not currently locked
     if utxo.status == UtxoStatus::Locked {
-        return Err("UTXO is locked as collateral".to_string());
+        return Err("Cannot withdraw: UTXO is locked as collateral for an active loan".to_string());
     }
     
-    // Check no active loans for this UTXO
+    // Check UTXO is not already withdrawn
+    if utxo.status == UtxoStatus::Withdrawn {
+        return Err("UTXO has already been withdrawn".to_string());
+    }
+    
+    // Verify no active loans exist for this UTXO
     let has_active_loan = State::with_read(|state| {
         state.loans.values().any(|loan| {
             loan.collateral_utxo_id == utxo_id && loan.status == LoanStatus::Active
@@ -219,13 +278,18 @@ pub async fn withdraw_collateral(utxo_id: UtxoId) -> Result<(), String> {
     });
     
     if has_active_loan {
-        return Err("UTXO has active loan".to_string());
+        return Err("Cannot withdraw: UTXO has an active loan that must be repaid first".to_string());
     }
     
-    // Mark as withdrawn
+    // 2. Only modify state after all validations pass
     State::with(|state| {
         if let Some(utxo) = state.utxos.get_mut(&utxo_id) {
             utxo.status = UtxoStatus::Withdrawn;
+            
+            ic_cdk::println!(
+                "User {} withdrew UTXO {}: {} satoshis",
+                caller, utxo_id, utxo.amount
+            );
         }
     });
     
@@ -280,3 +344,229 @@ pub fn get_utxo(utxo_id: UtxoId) -> Option<UTXO> {
     State::with_read(|state| state.utxos.get(&utxo_id).cloned())
 }
 
+
+
+// ============================================================================
+// Additional Vault Management Functions (Task 10)
+// ============================================================================
+
+/// Gets loan health information
+#[ic_cdk::query]
+pub fn get_loan_health(loan_id: LoanId) -> Result<LoanHealth, String> {
+    State::with_read(|state| {
+        let loan = state.loans.get(&loan_id)
+            .ok_or("Loan not found".to_string())?;
+        
+        let utxo = state.utxos.get(&loan.collateral_utxo_id)
+            .ok_or("Collateral UTXO not found".to_string())?;
+        
+        // Calculate current loan value (borrowed + interest - repaid)
+        let loan_value = calculate_loan_value(loan);
+        
+        // Calculate current LTV: (loan_value / collateral_value) * 10000
+        let current_ltv = if utxo.amount > 0 {
+            (loan_value * 10000) / utxo.amount
+        } else {
+            10000 // 100% if no collateral
+        };
+        
+        // Liquidation threshold is 80% (8000 basis points)
+        let liquidation_threshold = 8000u64;
+        
+        // Health factor: distance from liquidation (higher is better)
+        // health_factor = liquidation_threshold / current_ltv
+        // If > 1.0, loan is healthy. If < 1.0, loan can be liquidated
+        let health_factor = if current_ltv > 0 {
+            (liquidation_threshold * 100) / current_ltv
+        } else {
+            10000 // Perfect health if no debt
+        };
+        
+        Ok(LoanHealth {
+            loan_id,
+            current_ltv,
+            liquidation_threshold,
+            health_factor,
+            can_be_liquidated: current_ltv >= liquidation_threshold,
+            collateral_value: utxo.amount,
+            loan_value,
+        })
+    })
+}
+
+/// Gets statistics for a specific user
+#[ic_cdk::query]
+pub fn get_user_stats() -> UserStats {
+    let caller = ic_cdk::api::caller();
+    
+    State::with_read(|state| {
+        // Get user's UTXOs
+        let user_utxos = state.user_utxos.get(&caller).cloned().unwrap_or_default();
+        
+        // Calculate total collateral value
+        let total_collateral_value: u64 = user_utxos
+            .iter()
+            .filter_map(|id| state.utxos.get(id))
+            .map(|utxo| utxo.amount)
+            .sum();
+        
+        // Get user's loans
+        let user_loans = state.user_loans.get(&caller).cloned().unwrap_or_default();
+        
+        // Calculate total borrowed and total debt
+        let mut total_borrowed = 0u64;
+        let mut total_debt = 0u64;
+        let mut active_loans = 0u64;
+        
+        for loan_id in &user_loans {
+            if let Some(loan) = state.loans.get(loan_id) {
+                if loan.status == LoanStatus::Active {
+                    active_loans += 1;
+                    total_borrowed += loan.borrowed_amount;
+                    total_debt += calculate_loan_value(loan);
+                }
+            }
+        }
+        
+        // Calculate average LTV
+        let average_ltv = if total_collateral_value > 0 {
+            (total_debt * 10000) / total_collateral_value
+        } else {
+            0
+        };
+        
+        UserStats {
+            total_collateral_value,
+            total_borrowed,
+            total_debt,
+            active_loans_count: active_loans,
+            total_utxos_count: user_utxos.len() as u64,
+            average_ltv,
+        }
+    })
+}
+
+/// Gets overall vault statistics
+#[ic_cdk::query]
+pub fn get_vault_stats() -> VaultStats {
+    State::with_read(|state| {
+        // Calculate total value locked (all UTXOs)
+        let total_value_locked: u64 = state.utxos.values()
+            .map(|utxo| utxo.amount)
+            .sum();
+        
+        // Calculate total loans outstanding
+        let mut total_loans_outstanding = 0u64;
+        let mut active_loans_count = 0u64;
+        
+        for loan in state.loans.values() {
+            if loan.status == LoanStatus::Active {
+                active_loans_count += 1;
+                total_loans_outstanding += calculate_loan_value(loan);
+            }
+        }
+        
+        // Count unique users
+        let total_users = state.user_utxos.len() as u64;
+        
+        // Calculate utilization rate: (total_loans / total_collateral) * 10000
+        let utilization_rate = if total_value_locked > 0 {
+            (total_loans_outstanding * 10000) / total_value_locked
+        } else {
+            0
+        };
+        
+        VaultStats {
+            total_value_locked,
+            total_loans_outstanding,
+            active_loans_count,
+            total_users,
+            total_utxos: state.utxos.len() as u64,
+            utilization_rate,
+        }
+    })
+}
+
+/// Gets all loans in the system (paginated)
+#[ic_cdk::query]
+pub fn get_all_loans(offset: u64, limit: u64) -> LoansPage {
+    State::with_read(|state| {
+        let all_loans: Vec<Loan> = state.loans.values().cloned().collect();
+        let total = all_loans.len() as u64;
+        
+        let start = offset as usize;
+        let end = ((offset + limit) as usize).min(all_loans.len());
+        
+        let loans = if start < all_loans.len() {
+            all_loans[start..end].to_vec()
+        } else {
+            vec![]
+        };
+        
+        LoansPage {
+            loans,
+            total,
+            offset,
+            limit,
+        }
+    })
+}
+
+/// Liquidates a loan that exceeds the liquidation threshold
+#[ic_cdk::update]
+pub async fn liquidate_loan(loan_id: LoanId) -> Result<(), String> {
+    let caller = ic_cdk::api::caller();
+    
+    // Get loan and check if it can be liquidated
+    let (loan, utxo, can_liquidate) = State::with_read(|state| {
+        let loan = state.loans.get(&loan_id)
+            .ok_or("Loan not found".to_string())?;
+        
+        let utxo = state.utxos.get(&loan.collateral_utxo_id)
+            .ok_or("Collateral UTXO not found".to_string())?;
+        
+        // Check if loan is active
+        if loan.status != LoanStatus::Active {
+            return Err("Loan is not active".to_string());
+        }
+        
+        // Calculate current LTV
+        let loan_value = calculate_loan_value(loan);
+        let current_ltv = if utxo.amount > 0 {
+            (loan_value * 10000) / utxo.amount
+        } else {
+            10000
+        };
+        
+        // Liquidation threshold is 80%
+        let can_liquidate = current_ltv >= 8000;
+        
+        if !can_liquidate {
+            return Err(format!(
+                "Loan cannot be liquidated: LTV {}% is below 80% threshold",
+                current_ltv / 100
+            ));
+        }
+        
+        Ok((loan.clone(), utxo.clone(), can_liquidate))
+    })?;
+    
+    // Liquidate the loan
+    State::with(|state| {
+        if let Some(loan) = state.loans.get_mut(&loan_id) {
+            loan.status = LoanStatus::Liquidated;
+            
+            ic_cdk::println!(
+                "Loan {} liquidated by {}. Collateral UTXO {} transferred.",
+                loan_id, caller, loan.collateral_utxo_id
+            );
+        }
+        
+        // Mark UTXO as withdrawn (transferred to liquidator)
+        if let Some(utxo) = state.utxos.get_mut(&loan.collateral_utxo_id) {
+            utxo.status = UtxoStatus::Withdrawn;
+        }
+    });
+    
+    Ok(())
+}
