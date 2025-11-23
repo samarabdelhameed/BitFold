@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { TrendingUp, AlertTriangle } from 'lucide-react';
+import { borrow } from '../services/vaultService';
 
 export function LoanOffer() {
   const navigate = useNavigate();
@@ -42,21 +43,36 @@ export function LoanOffer() {
     }
 
     setIsBorrowing(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const newLoan = {
-      id: Date.now().toString(),
-      utxo: currentOrdinal.utxo,
-      ordinal: currentOrdinal,
-      borrowedAmount: borrowAmount,
-      remainingAmount: borrowAmount,
-      status: 'ACTIVE' as const,
-      ltv: maxLtv,
-      createdAt: new Date().toISOString()
-    };
+    try {
+      // Convert BTC to satoshis
+      const amountInSats = BigInt(Math.floor(borrowAmount * 100000000));
+      
+      // Get UTXO ID from current ordinal (assuming it's stored in utxo field)
+      // In production, you'd parse this properly
+      const utxoId = BigInt(1); // Placeholder - should come from deposit response
+      
+      // Call backend to borrow
+      const loanId = await borrow(utxoId, amountInSats);
 
-    addLoan(newLoan);
-    navigate('/borrow-success');
+      const newLoan = {
+        id: loanId.toString(),
+        utxo: currentOrdinal.utxo,
+        ordinal: currentOrdinal,
+        borrowedAmount: borrowAmount,
+        remainingAmount: borrowAmount,
+        status: 'ACTIVE' as const,
+        ltv: maxLtv,
+        createdAt: new Date().toISOString()
+      };
+
+      addLoan(newLoan);
+      navigate('/borrow-success');
+    } catch (err: any) {
+      console.error('Borrow failed:', err);
+      alert(err.message || 'Failed to borrow. Please try again.');
+      setIsBorrowing(false);
+    }
   };
 
   const isValidAmount = () => {

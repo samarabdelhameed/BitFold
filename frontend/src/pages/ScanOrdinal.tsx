@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { Search, CheckCircle, AlertCircle } from 'lucide-react';
+import { depositUtxo } from '../services/vaultService';
 
 export function ScanOrdinal() {
   const navigate = useNavigate();
@@ -21,22 +22,48 @@ export function ScanOrdinal() {
     setIsScanning(true);
     setError('');
 
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      // Parse UTXO input (format: txid:vout or just txid)
+      const parts = utxo.split(':');
+      const txid = parts[0];
+      const vout = parts.length > 1 ? parseInt(parts[1]) : 0;
 
-    const mockOrdinal = {
-      utxo,
-      inscriptionId: `${utxo.substring(0, 8)}...i0`,
-      imageUrl: 'https://images.pexels.com/photos/844124/pexels-photo-844124.jpeg?auto=compress&cs=tinysrgb&w=400',
-      satoshiValue: 100000000
-    };
+      // Validate txid format (64 hex characters)
+      if (!/^[a-fA-F0-9]{64}$/.test(txid)) {
+        setError('Invalid UTXO format. Please enter a valid transaction ID (64 hex characters)');
+        setIsScanning(false);
+        return;
+      }
 
-    setCurrentOrdinal(mockOrdinal);
-    setFound(true);
-    setIsScanning(false);
+      // Call backend to deposit UTXO
+      // Note: In production, you'd get the actual Bitcoin address and amount from user input or wallet
+      const utxoId = await depositUtxo({
+        txid,
+        vout,
+        amount: BigInt(100000000), // 1 BTC = 100,000,000 sats (placeholder)
+        address: 'tb1qw508d6qejxtdg4y5r3zarvary0c5xw7kxpjzsx', // Placeholder testnet address
+        // ordinalInfo will be fetched by backend from Maestro API
+      });
 
-    setTimeout(() => {
-      navigate('/preview');
-    }, 1500);
+      // Create ordinal object for UI
+      const mockOrdinal = {
+        utxo: `${txid}:${vout}`,
+        inscriptionId: `${txid.substring(0, 8)}...i0`,
+        imageUrl: 'https://images.pexels.com/photos/844124/pexels-photo-844124.jpeg?auto=compress&cs=tinysrgb&w=400',
+        satoshiValue: 100000000
+      };
+
+      setCurrentOrdinal(mockOrdinal);
+      setFound(true);
+      setIsScanning(false);
+
+      setTimeout(() => {
+        navigate('/preview');
+      }, 1500);
+    } catch (err: any) {
+      setError(err.message || 'Failed to verify UTXO. Please check the transaction ID and try again.');
+      setIsScanning(false);
+    }
   };
 
   return (

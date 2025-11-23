@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { DollarSign, CheckCircle, ArrowLeft } from 'lucide-react';
+import { repay } from '../services/vaultService';
 
 export function Repay() {
   const navigate = useNavigate();
@@ -24,20 +25,32 @@ export function Repay() {
     if (isNaN(repayAmount) || repayAmount <= 0) return;
 
     setIsRepaying(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    const newRemaining = Math.max(0, loan.remainingAmount - repayAmount);
-    updateLoan(loan.id, {
-      remainingAmount: newRemaining,
-      status: newRemaining === 0 ? 'REPAID' : 'ACTIVE'
-    });
+    try {
+      // Convert BTC to satoshis
+      const amountInSats = BigInt(Math.floor(repayAmount * 100000000));
+      const loanIdBigInt = BigInt(loan.id);
+      
+      // Call backend to repay
+      await repay(loanIdBigInt, amountInSats);
 
-    setIsRepaying(false);
-    setShowSuccess(true);
+      const newRemaining = Math.max(0, loan.remainingAmount - repayAmount);
+      updateLoan(loan.id, {
+        remainingAmount: newRemaining,
+        status: newRemaining === 0 ? 'REPAID' : 'ACTIVE'
+      });
 
-    setTimeout(() => {
-      navigate('/dashboard');
-    }, 2000);
+      setIsRepaying(false);
+      setShowSuccess(true);
+
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 2000);
+    } catch (err: any) {
+      console.error('Repay failed:', err);
+      alert(err.message || 'Failed to repay. Please try again.');
+      setIsRepaying(false);
+    }
   };
 
   const isValidAmount = () => {

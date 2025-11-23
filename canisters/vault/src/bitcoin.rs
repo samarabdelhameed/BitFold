@@ -30,6 +30,7 @@ pub async fn verify_utxo(utxo: &UTXO) -> Result<bool, String> {
             }
             
             // UTXO exists, is unspent, and amount matches
+            ic_cdk::println!("✅ Bitcoin UTXO verified: {}:{} ({} sats)", utxo.txid, utxo.vout, utxo.amount);
             return Ok(true);
         }
     }
@@ -42,7 +43,9 @@ pub async fn verify_utxo(utxo: &UTXO) -> Result<bool, String> {
 /// 
 /// Calls the ICP Bitcoin API with the specified address and minimum confirmations
 pub async fn get_utxos_for_address(address: &str, _min_confirmations: u32) -> Result<Vec<BtcUtxo>, String> {
-    let network = BitcoinNetwork::Testnet; // Use testnet for development
+    let network = BitcoinNetwork::Testnet; // Bitcoin Testnet
+    
+    ic_cdk::println!("🔍 Querying Bitcoin Testnet for address: {}", address);
     
     let request = GetUtxosRequest {
         address: address.to_string(),
@@ -54,6 +57,8 @@ pub async fn get_utxos_for_address(address: &str, _min_confirmations: u32) -> Re
     let response: (GetUtxosResponse,) = bitcoin_get_utxos(request)
         .await
         .map_err(|e| format!("Bitcoin API call failed: {:?}", e))?;
+    
+    ic_cdk::println!("✅ Found {} UTXOs for address", response.0.utxos.len());
     
     // Return UTXOs (confirmation filtering can be added based on tip_height)
     Ok(response.0.utxos)

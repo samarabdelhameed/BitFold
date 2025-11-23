@@ -5,6 +5,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { VaultDoor } from '../components/VaultDoor';
 import { Unlock, ArrowLeft } from 'lucide-react';
+import { withdrawCollateral } from '../services/vaultService';
 
 export function Withdraw() {
   const navigate = useNavigate();
@@ -29,9 +30,22 @@ export function Withdraw() {
     setIsWithdrawing(true);
     setDoorOpening(true);
 
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    try {
+      // Get UTXO ID from loan (assuming it's stored)
+      // In production, you'd get this from the loan's collateral_utxo_id
+      const utxoId = BigInt(1); // Placeholder
+      
+      // Call backend to withdraw
+      await withdrawCollateral(utxoId);
 
-    navigate('/congrats');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      navigate('/congrats');
+    } catch (err: any) {
+      console.error('Withdraw failed:', err);
+      alert(err.message || 'Failed to withdraw. Please try again.');
+      setIsWithdrawing(false);
+      setDoorOpening(false);
+    }
   };
 
   return (

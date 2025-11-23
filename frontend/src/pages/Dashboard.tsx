@@ -1,12 +1,61 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { Wallet, TrendingUp, Lock, Home, ArrowLeft } from 'lucide-react';
 import { LoanChart } from '../components/LoanChart';
+import { getUserLoans, getCollateral } from '../services/vaultService';
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const { loans } = useApp();
+  const { loans, setLoans, isIcpAuthenticated } = useApp();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Fetch loans from backend on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!isIcpAuthenticated) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const [backendLoans, collateral] = await Promise.all([
+          getUserLoans(),
+          getCollateral()
+        ]);
+
+        // Convert backend loans to frontend format
+        const formattedLoans = backendLoans.map(loan => ({
+          id: loan.id.toString(),
+          utxo: `${loan.collateral_utxo_id}`,
+          ordinal: {
+            utxo: `${loan.collateral_utxo_id}`,
+            inscriptionId: `${loan.collateral_utxo_id}...i0`,
+            imageUrl: 'https://images.pexels.com/photos/844124/pexels-photo-844124.jpeg?auto=compress&cs=tinysrgb&w=400',
+            satoshiValue: 100000000
+          },
+          borrowedAmount: Number(loan.borrowed_amount) / 100000000, // Convert sats to BTC
+          remainingAmount: Number(loan.borrowed_amount - loan.repaid_amount) / 100000000,
+          status: 'Active' in loan.status ? 'ACTIVE' : 'Repaid' in loan.status ? 'REPAID' : 'LIQUIDATED',
+          ltv: 70, // Placeholder
+          createdAt: new Date(Number(loan.created_at) / 1000000).toISOString()
+        }));
+
+        setLoans(formattedLoans);
+        setError('');
+      } catch (err: any) {
+        console.error('Failed to fetch loans:', err);
+        setError(err.message || 'Failed to load loans');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [isIcpAuthenticated, setLoans]);
 
   const totalBorrowed = loans.reduce((sum, loan) => sum + loan.borrowedAmount, 0);
   const totalCollateral = loans.length;
@@ -110,7 +159,26 @@ export function Dashboard() {
         >
           <h2 className="text-2xl font-bold text-white mb-6">Your Loans</h2>
 
-          {loans.length === 0 ? (
+          {loading ? (
+            <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-lg rounded-2xl p-12 border border-gray-700/50 text-center">
+              <motion.div
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                className="w-12 h-12 border-4 border-[#00D4FF] border-t-transparent rounded-full mx-auto mb-4"
+              />
+              <p className="text-gray-400">Loading your loans...</p>
+            </div>
+          ) : error ? (
+            <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-lg rounded-2xl p-12 border border-red-500/50 text-center">
+              <p className="text-red-400 mb-4">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="text-[#00D4FF] hover:underline"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : loans.length === 0 ? (
             <div className="bg-gradient-to-br from-gray-800/50 to-gray-900/50 backdrop-blur-lg rounded-2xl p-12 border border-gray-700/50 text-center">
               <Lock className="w-16 h-16 text-gray-600 mx-auto mb-4" />
               <p className="text-gray-400 text-lg mb-6">No active loans yet</p>

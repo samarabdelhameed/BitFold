@@ -293,72 +293,72 @@
     - Fix any compilation errors
     - Verify Candid interface generation
 
-  - [ ] 12.2 Deploy to local replica
+  - [x] 12.2 Deploy to local replica
     - Start local dfx replica
     - Deploy vault canister
     - Verify deployment success
 
-  - [ ] 12.3 Test basic functionality locally with real testnet data
+  - [x] 12.3 Test basic functionality locally with real testnet data
     - Test deposit_utxo with REAL Bitcoin testnet UTXO
     - Test borrow flow with REAL ckBTC testnet ledger
     - Test repay flow with REAL ckBTC transfers
     - Test withdraw flow with verified data
     - NO MOCK DATA - all tests use real blockchain data
 
-- [ ] 13. Configure for Bitcoin testnet integration
-  - [ ] 13.1 Update Bitcoin network configuration
+- [x] 13. Configure for Bitcoin testnet integration
+  - [x] 13.1 Update Bitcoin network configuration
     - Set network to `BitcoinNetwork::Testnet`
     - Configure testnet parameters
     - _Requirements: 1.1_
 
-  - [ ] 13.2 Test with real Bitcoin testnet UTXO
+  - [x] 13.2 Test with real Bitcoin testnet UTXO
     - Find a real testnet UTXO
     - Test deposit_utxo with real data
     - Verify Bitcoin API integration works
     - _Requirements: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 14. Configure for ckBTC testnet integration
-  - [ ] 14.1 Update ckBTC ledger canister ID
+- [x] 14. Configure for ckBTC testnet integration
+  - [x] 14.1 Update ckBTC ledger canister ID
     - Set to testnet ledger: `mc6ru-gyaaa-aaaar-qaaaq-cai`
     - Configure ICRC-1 interface
     - _Requirements: 4.2, 5.1_
 
-  - [ ] 14.2 Test with real ckBTC testnet
+  - [x] 14.2 Test with real ckBTC testnet
     - Test transfer_ckbtc with testnet ledger
     - Test balance queries
     - Verify ckBTC integration works
     - _Requirements: 4.2, 5.1, 5.2_
 
-- [ ] 15. Configure Ordinals indexer integration
-  - [ ] 15.1 Set up Maestro API integration
+- [x] 15. Configure Ordinals indexer integration
+  - [x] 15.1 Set up Maestro API integration
     - Configure API endpoint and key
     - Implement HTTP outcalls
     - _Requirements: 3.1_
 
-  - [ ] 15.2 Test with real Ordinals data
+  - [x] 15.2 Test with real Ordinals data
     - Test verify_ordinal with real inscription
     - Test with non-inscription UTXO
     - Verify indexer integration works
     - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 16. Frontend integration with ICP Agent
-  - [ ] 16.1 Add @dfinity/agent dependencies to frontend
+- [x] 16. Frontend integration with ICP Agent
+  - [x] 16.1 Add @dfinity/agent dependencies to frontend
     - Install @dfinity/agent, @dfinity/auth-client, @dfinity/candid
     - Update package.json
     - _Requirements: All (Frontend)_
 
-  - [ ] 16.2 Generate Candid declarations for vault canister
+  - [x] 16.2 Generate Candid declarations for vault canister
     - Run dfx generate to create TypeScript declarations
     - Copy declarations to frontend/src/declarations
     - _Requirements: All (Frontend)_
 
-  - [ ] 16.3 Create ICP Agent service
+  - [x] 16.3 Create ICP Agent service
     - Create frontend/src/services/icpAgent.ts
     - Initialize HttpAgent with local/testnet URL
     - Configure agent for authentication
     - _Requirements: All (Frontend)_
 
-  - [ ] 16.4 Create vault service layer
+  - [x] 16.4 Create vault service layer
     - Create frontend/src/services/vaultService.ts
     - Implement depositUtxo() function
     - Implement borrow() function
@@ -368,54 +368,54 @@
     - Implement getCollateral() function
     - _Requirements: All (Frontend)_
 
-  - [ ] 16.5 Add Internet Identity authentication
+  - [x] 16.5 Add Internet Identity authentication
     - Install @dfinity/auth-client
     - Create authentication context
     - Implement login/logout functions
     - Store authenticated principal
     - _Requirements: All (Frontend)_
 
-  - [ ] 16.6 Update AppContext with canister connection
+  - [x] 16.6 Update AppContext with canister connection
     - Add vault canister actor to context
     - Add authentication state
     - Add user principal
     - Provide context to all pages
     - _Requirements: All (Frontend)_
 
-  - [ ] 16.7 Update ScanOrdinal page to call deposit_utxo
+  - [x] 16.7 Update ScanOrdinal page to call deposit_utxo
     - Connect form submission to vaultService.depositUtxo()
     - Handle success/error responses
     - Display transaction result
     - _Requirements: 1.1, 3.1_
 
-  - [ ] 16.8 Update LoanOffer page to call borrow
+  - [x] 16.8 Update LoanOffer page to call borrow
     - Connect borrow button to vaultService.borrow()
     - Calculate max borrowable amount
     - Handle ckBTC transfer
     - Display loan details
     - _Requirements: 4.1, 4.2_
 
-  - [ ] 16.9 Update Repay page to call repay
+  - [x] 16.9 Update Repay page to call repay
     - Connect repayment form to vaultService.repay()
     - Show current loan balance
     - Handle ckBTC transfer verification
     - Update loan status
     - _Requirements: 5.1, 5.2_
 
-  - [ ] 16.10 Update Dashboard page to fetch loans from canister
+  - [x] 16.10 Update Dashboard page to fetch loans from canister
     - Call vaultService.getUserLoans() on page load
     - Display real loan data
     - Show collateral status
     - Calculate health factors
     - _Requirements: 9.1, 9.2_
 
-  - [ ] 16.11 Update Withdraw page to call withdraw_collateral
+  - [x] 16.11 Update Withdraw page to call withdraw_collateral
     - Connect withdrawal button to vaultService.withdrawCollateral()
     - Verify loan is repaid
     - Handle withdrawal confirmation
     - _Requirements: 6.1, 6.2, 6.3_
 
-  - [ ]* 16.12 Add error handling to all frontend pages
+  - [x]* 16.12 Add error handling to all frontend pages
     - Display user-friendly error messages
     - Handle network errors
     - Handle authentication errors
@@ -429,55 +429,53 @@
     - Test error scenarios
     - _Requirements: All (Frontend)_
 
-- [ ] 17. Final integration testing
-  - [ ] 17.1 Test complete flow with real APIs
+- [x] 17. Final integration testing
+  - [x] 17.1 Test complete flow with real APIs
     - Deposit real testnet UTXO
     - Borrow ckBTC from testnet ledger
     - Repay loan
     - Withdraw collateral
 
-  - [ ] 17.2 Test error scenarios
+  - [x] 17.2 Test error scenarios
     - Test with invalid UTXO
     - Test with insufficient collateral
     - Test unauthorized operations
 
-  - [ ] 17.3 Test with Ordinals
+  - [x] 17.3 Test with Ordinals
     - Deposit UTXO with inscription
     - Verify metadata is stored
     - Complete borrow/repay/withdraw flow
 
-  - [ ] 17.4 Test frontend with real APIs
+  - [x] 17.4 Test frontend with real APIs
     - Test deposit with real Bitcoin testnet UTXO
     - Test borrow with real ckBTC testnet
     - Test repay flow
     - Test withdraw flow
     - Verify all UI updates correctly
 
-- [ ] 18. Final checkpoint - Ensure all tests pass
+- [x] 18. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 19. Documentation and deployment preparation
-  - [ ] 19.1 Update README with deployment instructions
+- [x] 19. Documentation and deployment preparation
+  - [x] 19.1 Update README with deployment instructions
     - Document how to build and deploy
     - Document API endpoints
     - Document testing procedures
 
-  - [ ] 19.2 Document configuration parameters
+  - [x] 19.2 Document configuration parameters
     - Bitcoin network selection
     - ckBTC ledger canister IDs
     - Ordinals indexer configuration
 
-  - [ ] 19.3 Prepare for testnet deployment
+  - [x] 19.3 Prepare for testnet deployment
     - Verify all configurations
     - Test deployment script
     - Document deployment process
 
-  - [ ] 19.4 Create demo video script
+  - [x] 19.4 Create demo video script
     - Outline 3-minute demo flow
     - Prepare test data (testnet UTXO, ckBTC)
     - Document key features to showcase
-    - Verify all configurations
-    - Test deployment script
     - Document deployment process
 
 

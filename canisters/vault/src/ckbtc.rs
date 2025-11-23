@@ -5,7 +5,7 @@ use serde::Serialize;
 /// ckBTC Ledger Canister ID
 /// Testnet: mc6ru-gyaaa-aaaar-qaaaq-cai
 /// Mainnet: mxzaz-hqaaa-aaaar-qaada-cai
-const CKBTC_LEDGER_CANISTER_ID: &str = "mc6ru-gyaaa-aaaar-qaaaq-cai"; // Testnet
+const CKBTC_LEDGER_CANISTER_ID: &str = "mc6ru-gyaaa-aaaar-qaaaq-cai"; // ckBTC Testnet Ledger
 
 /// ICRC-1 Account structure
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
@@ -77,6 +77,8 @@ pub struct Transfer {
 /// Transfers ckBTC from the canister to a user
 /// Returns the block index on success
 pub async fn transfer_ckbtc(to: Principal, amount: u64) -> Result<u64, String> {
+    ic_cdk::println!("💸 Transferring {} sats ckBTC to {}", amount, to);
+    
     let ledger_id = Principal::from_text(CKBTC_LEDGER_CANISTER_ID)
         .map_err(|e| format!("Invalid ledger canister ID: {:?}", e))?;
 
@@ -98,7 +100,7 @@ pub async fn transfer_ckbtc(to: Principal, amount: u64) -> Result<u64, String> {
         Ok((TransferResult::Ok(block_index),)) => {
             // Convert Nat to u64
             let block_idx = nat_to_u64(&block_index)?;
-            ic_cdk::println!("Successfully transferred {} satoshis to {}, block index: {}", amount, to, block_idx);
+            ic_cdk::println!("✅ ckBTC transfer successful! Block: {}", block_idx);
             Ok(block_idx)
         }
         Ok((TransferResult::Err(err),)) => {
@@ -113,6 +115,8 @@ pub async fn transfer_ckbtc(to: Principal, amount: u64) -> Result<u64, String> {
 /// Verifies that a user has transferred ckBTC to the canister
 /// Checks recent transactions to confirm the transfer
 pub async fn verify_transfer_to_canister(from: Principal, amount: u64) -> Result<bool, String> {
+    ic_cdk::println!("🔍 Verifying ckBTC transfer: {} sats from {}", amount, from);
+    
     let ledger_id = Principal::from_text(CKBTC_LEDGER_CANISTER_ID)
         .map_err(|e| format!("Invalid ledger canister ID: {:?}", e))?;
 
@@ -178,7 +182,7 @@ pub async fn verify_transfer_to_canister(from: Principal, amount: u64) -> Result
                     if transfer.from.owner == from && 
                        transfer.to.owner == canister_id &&
                        nat_to_u64(&transfer.amount)? >= amount {
-                        ic_cdk::println!("Verified transfer of {} satoshis from {}", amount, from);
+                        ic_cdk::println!("✅ ckBTC transfer verified: {} sats from {}", amount, from);
                         return Ok(true);
                     }
                 }

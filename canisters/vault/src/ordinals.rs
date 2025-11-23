@@ -25,10 +25,12 @@ pub async fn verify_ordinal(txid: &str, vout: u32) -> Result<Option<OrdinalInfo>
     // Construct inscription ID from txid and vout
     let inscription_id = format!("{}i{}", txid, vout);
     
+    ic_cdk::println!("🔍 Checking for Ordinal inscription: {}", inscription_id);
+    
     // Try to get inscription metadata from Maestro API
     match get_inscription_metadata(&inscription_id).await {
         Ok(ordinal_info) => {
-            ic_cdk::println!("Found inscription: {}", inscription_id);
+            ic_cdk::println!("✅ Found Ordinal inscription: {} ({})", inscription_id, ordinal_info.content_type);
             Ok(Some(ordinal_info))
         }
         Err(e) => {
@@ -39,7 +41,7 @@ pub async fn verify_ordinal(txid: &str, vout: u32) -> Result<Option<OrdinalInfo>
             }
             
             // 404 or inscription not found - this is OK, just means no inscription
-            ic_cdk::println!("No inscription found for {}:{}, treating as regular UTXO", txid, vout);
+            ic_cdk::println!("ℹ️  No inscription found for {}:{}, treating as regular UTXO", txid, vout);
             Ok(None)
         }
     }
