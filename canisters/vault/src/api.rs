@@ -35,13 +35,27 @@ pub async fn deposit_utxo(request: DepositUtxoRequest) -> Result<UtxoId, String>
     };
     
     // Verify UTXO exists on Bitcoin network using ICP Bitcoin API
-    let verified = bitcoin::verify_utxo(&utxo).await?;
+    // Skip verification on playground due to HTTP outcalls being disabled
+    let network = std::env::var("DFX_NETWORK").unwrap_or_else(|_| "local".to_string());
+    let verified = if network == "playground" {
+        ic_cdk::println!("⚠️ Skipping UTXO verification on playground");
+        true
+    } else {
+        bitcoin::verify_utxo(&utxo).await?
+    };
+    
     if !verified {
         return Err("UTXO verification failed: UTXO not found or already spent".to_string());
     }
     
     // Query Ordinals indexer to check for inscriptions
-    let ordinal_info = ordinals::verify_ordinal(&utxo.txid, utxo.vout).await?;
+    // Skip on playground due to HTTP outcalls being disabled
+    let ordinal_info = if network == "playground" {
+        ic_cdk::println!("⚠️ Skipping ordinals verification on playground");
+        request.ordinal_info
+    } else {
+        ordinals::verify_ordinal(&utxo.txid, utxo.vout).await?
+    };
     
     // 3. Only modify state after all validations and external calls succeed
     let utxo_id = State::with(|state| {

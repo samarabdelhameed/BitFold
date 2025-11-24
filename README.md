@@ -6,22 +6,87 @@ Borrow `ckBTC` instantly by locking your Ordinal NFTs as collateral — no bridg
 
 ## 🚀 Live Demo
 
-[Watch 3-min video](https://youtu.be/XXXX)  
+[Watch 3-min Demo Video](https://youtu.be/xcFq9ONV9jc)  
 
-[Live App](https://XXXX.ic0.app)
+[Live App (Vercel)](https://frontend-1yy7lf8i7-samarabdelhameeds-projects-df99c328.vercel.app/)  
+
+[Live App (ICP)](https://XXXX.ic0.app)
 
 ## 🧪 Install & Run Local
+
+### الخطوة 1: تثبيت المشروع
 
 ```bash
 git clone https://github.com/samarabdelhameed/BitFold
 cd BitFold
-dfx start --background --clean
-dfx deploy
 npm --prefix frontend install
+```
+
+### الخطوة 2: تشغيل Local Replica
+
+```bash
+dfx start --background --clean
+```
+
+انتظر حتى يظهر: `"Replica started"`
+
+### الخطوة 3: Deploy Canisters
+
+```bash
+dfx deploy
+```
+
+هذا سيقوم بـ:
+- Deploy Vault Canister
+- Deploy Internet Identity Canister  
+- Deploy Frontend Canister
+
+### الخطوة 4: Build Frontend
+
+```bash
 npm --prefix frontend run build
 ```
 
-Open http://localhost:4943?canisterId=<frontend-id>
+### الخطوة 5: احصل على Canister IDs
+
+```bash
+# Frontend Canister ID (للتطبيق)
+dfx canister id frontend
+
+# Vault Canister ID (للتجربة في Candid UI)
+dfx canister id vault
+```
+
+### الخطوة 6: افتح التطبيق
+
+**افتح المتصفح واذهب إلى:**
+
+```
+http://localhost:4943?canisterId=<frontend-canister-id>
+```
+
+**أو استخدم الأمر:**
+
+```bash
+FRONTEND_ID=$(dfx canister id frontend)
+open "http://localhost:4943?canisterId=${FRONTEND_ID}"
+```
+
+### 🔧 Candid UI (للتجربة المباشرة مع Canister)
+
+**للتجربة مع Vault Canister مباشرة:**
+
+1. افتح: `http://localhost:4943`
+2. أدخل Vault Canister ID في حقل "Provide a canister ID"
+3. اضغط "GO"
+
+**أو استخدم الأمر:**
+
+```bash
+VAULT_ID=$(dfx canister id vault)
+CANDID_UI_ID="bd3sg-teaaa-aaaaa-qaaba-cai"
+open "http://localhost:4943/?canisterId=${CANDID_UI_ID}&id=${VAULT_ID}"
+```
 
 ## 📄 Docs
 

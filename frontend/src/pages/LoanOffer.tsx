@@ -32,6 +32,14 @@ export function LoanOffer() {
         }
       }
       
+      // Validate UTXO ID (must be > 0)
+      if (!utxoId || utxoId === BigInt(0)) {
+        console.warn('⚠️ LoanOffer: No valid UTXO ID found. Redirecting to scan...');
+        alert('Please scan your Ordinal first to get started.');
+        navigate('/scan');
+        return;
+      }
+      
       if (!utxoId) {
         console.warn('⚠️ LoanOffer: No UTXO ID found');
         setIsLoading(false);
@@ -144,7 +152,10 @@ export function LoanOffer() {
         }
       }
       
-      if (!utxoId) {
+      // Validate UTXO ID (must be > 0)
+      if (!utxoId || utxoId === BigInt(0)) {
+        alert('Please scan your Ordinal first to get started.');
+        navigate('/scan');
         throw new Error('UTXO ID not found. Please scan your Ordinal again.');
       }
       

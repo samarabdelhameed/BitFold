@@ -11,11 +11,29 @@ async function getVaultActor(): Promise<_SERVICE> {
   // For update calls, require authentication
   // Always reinitialize to ensure we have the latest identity
   // This is important after login/logout or expired delegations
-  await initAgent(true); // requireAuth = true for update calls
   
-  // Always create new actor with fresh agent to avoid stale identity issues
-  vaultActor = createActor<_SERVICE>(getVaultCanisterId(), idlFactory);
-  return vaultActor;
+  // Retry logic for agent initialization (helps with root key fetching)
+  let retries = 3;
+  let lastError;
+  
+  while (retries > 0) {
+    try {
+      await initAgent(true); // requireAuth = true for update calls
+      
+      // Always create new actor with fresh agent to avoid stale identity issues
+      vaultActor = createActor<_SERVICE>(getVaultCanisterId(), idlFactory);
+      return vaultActor;
+    } catch (error) {
+      lastError = error;
+      retries--;
+      if (retries > 0) {
+        console.warn(`⚠️ Agent initialization failed, retrying... (${retries} attempts left)`);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+  }
+  
+  throw lastError || new Error('Failed to initialize vault actor');
 }
 
 /**
@@ -46,7 +64,7 @@ export async function depositUtxo(request: {
     const actor = await getVaultActor();
     
     if (!actor) {
-      throw new Error('Vault actor not initialized. Please connect Internet Identity first.');
+      throw new Error('Vault canister not initialized. Please connect Internet Identity first.');
     }
     
     const depositRequest: DepositUtxoRequest = {
@@ -185,10 +203,16 @@ export async function getCollateral(): Promise<UTXO[]> {
  * Get user's loans
  */
 export async function getUserLoans(): Promise<Loan[]> {
-  // For query calls, we can use requireAuth = false
-  await initAgent(false);
-  const actor = createActor<_SERVICE>(getVaultCanisterId(), idlFactory);
-  return await actor.get_user_loans();
+  try {
+    // For query calls, we can use requireAuth = false
+    await initAgent(false);
+    const actor = createActor<_SERVICE>(getVaultCanisterId(), idlFactory);
+    return await actor.get_user_loans();
+  } catch (error: any) {
+    console.error('Error getting user loans:', error);
+    // Return empty array on error instead of throwing
+    return [];
+  }
 }
 
 /**

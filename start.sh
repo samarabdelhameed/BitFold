@@ -28,25 +28,26 @@ echo -e "\n${BLUE}🛑 Step 2: Stopping any previous processes...${NC}"
 dfx stop 2>/dev/null || true
 pkill -f "dfx start" 2>/dev/null || true
 pkill -f "vite" 2>/dev/null || true
-# Kill any process using port 4943
+# Kill any process using ports 4943 and 8080
 lsof -ti:4943 | xargs kill -9 2>/dev/null || true
+lsof -ti:8080 | xargs kill -9 2>/dev/null || true
 sleep 3
 echo -e "${GREEN}✅ Previous processes stopped${NC}"
 
-# 3. Start dfx
-echo -e "\n${BLUE}🔧 Step 3: Starting dfx...${NC}"
-dfx start --background --clean
+# 3. Start dfx with HTTP outcalls enabled on port 8080
+echo -e "\n${BLUE}🔧 Step 3: Starting dfx with HTTP outcalls enabled...${NC}"
+dfx start --background --clean --host 127.0.0.1:8080 --enable-canister-http
 if [ $? -ne 0 ]; then
     echo -e "${YELLOW}⚠️  dfx start had issues, waiting a bit longer...${NC}"
     sleep 5
     # Try to check if it's actually running
-    dfx ping 2>/dev/null || {
+    DFX_PORT=8080 dfx ping 2>/dev/null || {
         echo -e "${RED}❌ dfx failed to start. Please check the error above.${NC}"
         exit 1
     }
 fi
 sleep 5
-echo -e "${GREEN}✅ dfx is now running${NC}"
+echo -e "${GREEN}✅ dfx is now running on port 8080 with HTTP outcalls enabled${NC}"
 
 # 4. Build and deploy Canisters
 echo -e "\n${BLUE}🏗️  Step 4: Building and deploying Canisters...${NC}"
@@ -148,14 +149,14 @@ echo ""
 echo -e "${YELLOW}📱 Access Links:${NC}"
 echo ""
 echo -e "  🌐 Frontend:"
-echo -e "     http://127.0.0.1:4943/?canisterId=${FRONTEND_CANISTER_ID}"
+echo -e "     http://127.0.0.1:8080/?canisterId=${FRONTEND_CANISTER_ID}"
 echo ""
 echo -e "  🔧 Vault Canister Candid UI:"
 CANDID_UI_ID=$(dfx canister id __Candid_UI 2>/dev/null || echo "bd3sg-teaaa-aaaaa-qaaba-cai")
-echo -e "     http://127.0.0.1:4943/?canisterId=${CANDID_UI_ID}&id=${VAULT_CANISTER_ID}"
+echo -e "     http://127.0.0.1:8080/?canisterId=${CANDID_UI_ID}&id=${VAULT_CANISTER_ID}"
 echo ""
 echo -e "  📊 Indexer Canister Candid UI:"
-echo -e "     http://127.0.0.1:4943/?canisterId=${CANDID_UI_ID}&id=${INDEXER_CANISTER_ID}"
+echo -e "     http://127.0.0.1:8080/?canisterId=${CANDID_UI_ID}&id=${INDEXER_CANISTER_ID}"
 echo ""
 echo -e "${YELLOW}🆔 Canister IDs:${NC}"
 echo "  Vault: ${VAULT_CANISTER_ID}"

@@ -8,6 +8,8 @@ const VAULT_CANISTER_ID = import.meta.env.VITE_VAULT_CANISTER_ID || 'br5f7-7uaaa
 // Determine host based on environment
 const HOST = import.meta.env.VITE_DFX_NETWORK === 'ic' 
   ? 'https://ic0.app' 
+  : import.meta.env.VITE_DFX_NETWORK === 'playground'
+  ? 'https://icp0.io'
   : 'http://127.0.0.1:4943';
 
 let agent: HttpAgent | null = null;
@@ -18,7 +20,8 @@ let identity: any = null;
  * Initialize the ICP agent
  */
 export async function initAgent(requireAuth: boolean = false): Promise<HttpAgent> {
-  const isLocal = import.meta.env.VITE_DFX_NETWORK !== 'ic';
+  const network = import.meta.env.VITE_DFX_NETWORK;
+  const isLocal = network !== 'ic' && network !== 'playground';
   
   // Always create/refresh auth client to get latest identity
   if (!authClient) {
@@ -35,6 +38,11 @@ export async function initAgent(requireAuth: boolean = false): Promise<HttpAgent
     if (isLocal && !requireAuth) {
       // For local development, use anonymous identity for queries
       console.log('ℹ️ Using anonymous identity for local development (queries only)');
+      const { AnonymousIdentity } = await import('@dfinity/agent');
+      identity = new AnonymousIdentity();
+    } else if (!requireAuth) {
+      // For playground/production queries without auth, use anonymous identity
+      console.log('ℹ️ Using anonymous identity for queries');
       const { AnonymousIdentity } = await import('@dfinity/agent');
       identity = new AnonymousIdentity();
     } else {
@@ -56,7 +64,7 @@ export async function initAgent(requireAuth: boolean = false): Promise<HttpAgent
   }
   
   // If agent exists and we don't need to recreate it, return it
-  if (agent && !requireAuth) {
+  if (agent && !requireAuth && !isLocal) {
     return agent;
   }
 
@@ -64,18 +72,23 @@ export async function initAgent(requireAuth: boolean = false): Promise<HttpAgent
   agent = new HttpAgent({
     host: HOST,
     identity,
-    verifyQuerySignatures: false, // Disable query signature verification for local dev
   });
   
   // Fetch root key for local development BEFORE any other operations
+  // This is CRITICAL for local development to avoid certificate verification errors
+  // MUST be called before any canister calls
   if (isLocal) {
     try {
       await agent.fetchRootKey();
-      console.log('✅ Root key fetched successfully');
+      console.log('✅ Root key fetched successfully for local development');
+      
+      // Small delay to ensure root key is properly set
+      await new Promise(resolve => setTimeout(resolve, 200));
     } catch (err) {
       console.warn('⚠️ Unable to fetch root key. Check if the local replica is running');
       console.warn('💡 Run: dfx start --background');
       console.error(err);
+      throw new Error('Failed to fetch root key. Please ensure dfx is running.');
     }
   }
 
@@ -132,11 +145,13 @@ export async function login(): Promise<void> {
 
   return new Promise((resolve, reject) => {
     let identityProvider: string;
+    const network = import.meta.env.VITE_DFX_NETWORK;
     
-    if (import.meta.env.VITE_DFX_NETWORK === 'ic') {
-      // Production: use mainnet Internet Identity
+    if (network === 'ic' || network === 'playground') {
+      // Production/Playground: use mainnet Internet Identity
       identityProvider = 'https://identity.ic0.app';
-    } else {
+      console.log(`ℹ️ Using mainnet Internet Identity for ${network} network`);
+    } else if (network === 'local') {
       // Local development: MUST use local Internet Identity
       // Using mainnet II with local replica causes signature verification failures
       
@@ -170,13 +185,11 @@ export async function login(): Promise<void> {
         }
       }
       
-      // Use the standard localhost format for Internet Identity
-      // Format: http://<canister-id>.localhost:4943
-      identityProvider = `http://${localCanisterId}.localhost:4943`;
+      // For local development, use the deployed local Internet Identity
+      const localIICanisterId = localCanisterId || 'br5f7-7uaaa-aaaaa-qaaca-cai';
+      identityProvider = `http://${localIICanisterId}.localhost:4943`;
       console.log(`ℹ️ Using local Internet Identity: ${identityProvider}`);
-      console.log(`📋 Canister ID: ${localCanisterId}`);
-      console.log('💡 If this fails, make sure Internet Identity is deployed locally:');
-      console.log('   dfx deploy internet_identity');
+      console.log(`📋 Canister ID: ${localIICanisterId}`);
     }
     
     authClient!.login({
