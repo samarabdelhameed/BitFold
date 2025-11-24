@@ -10,6 +10,16 @@
       "package": "indexer_stub",
       "candid": "canisters/indexer_stub/indexer_stub.did"
     },
+    "internet_identity": {
+      "type": "custom",
+      "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
+      "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz",
+      "remote": {
+        "id": {
+          "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
+        }
+      }
+    },
     "frontend": {
       "type": "assets",
       "source": ["frontend/dist"]
@@ -21,4 +31,3 @@
   "output_env_file": ".env",
   "version": 1
 }
-

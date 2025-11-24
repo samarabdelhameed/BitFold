@@ -71,6 +71,25 @@ pub struct RepayRequest {
     pub amount: u64,  // in satoshis
 }
 
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct LoanOffer {
+    pub id: u64,
+    pub user_id: Principal,
+    pub utxo_id: UtxoId,
+    pub max_borrowable: u64,  // in satoshis
+    pub ltv_percent: u64,     // LTV percentage (e.g., 50 = 50%)
+    pub status: LoanOfferStatus,
+    pub created_at: u64,      // timestamp in nanoseconds
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub enum LoanOfferStatus {
+    Active,
+    Accepted,  // When loan is created from this offer
+    Expired,
+    Cancelled,
+}
+
 
 
 // ============================================================================

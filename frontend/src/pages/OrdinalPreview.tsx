@@ -3,11 +3,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { Lock, Info, Loader2, CheckCircle } from 'lucide-react';
-import { getUtxo } from '../services/vaultService';
+import { getUtxo, depositUtxo, lockCollateral } from '../services/vaultService';
+import { isTestAddress, createTestUtxo } from '../services/testUtxoService';
 
 export function OrdinalPreview() {
   const navigate = useNavigate();
-  const { currentOrdinal, isIcpAuthenticated } = useApp();
+  const { currentOrdinal, isIcpAuthenticated, btcAddress, setCurrentOrdinal } = useApp();
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -75,24 +76,85 @@ export function OrdinalPreview() {
         throw new Error('Please connect Internet Identity first.');
       }
       
-      if (!utxoId) {
-        // If UTXO ID is not available, we need to get it from the backend
-        // This should have been set when deposit_utxo was called in ScanOrdinal
-        // For now, we'll navigate to offer page - the actual lock happens when borrowing
-        console.log('⚠️ UTXO ID not found. Navigating to offer page...');
-        navigate('/offer');
-        return;
+      if (!currentOrdinal) {
+        throw new Error('No ordinal selected.');
       }
       
-      // In production, you might want to call a lock_collateral method here
-      // For now, the lock happens automatically when borrowing
-      console.log('✅ Locking UTXO:', utxoId);
+      // Double-check authentication before making calls
+      const { isAuthenticated } = await import('../services/icpAgent');
+      const authenticated = await isAuthenticated();
+      if (!authenticated) {
+        throw new Error('Internet Identity session expired. Please reconnect.');
+      }
       
-      // Navigate to offer page where the actual lock happens during borrow
-      navigate('/offer');
-    } catch (error: any) {
+      // If UTXO ID is not available, we need to deposit it first
+      let finalUtxoId = utxoId;
+      
+      if (!finalUtxoId) {
+        console.log('⚠️ UTXO ID not found. Depositing UTXO to backend...');
+        
+        // Check if we're in test mode
+        const isTest = btcAddress && isTestAddress(btcAddress);
+        
+        if (isTest) {
+          // In test mode, we still need to call deposit_utxo to get a UTXO ID
+          // The backend will handle test mode appropriately
+          console.log('🧪 Test Mode: Depositing test UTXO to backend...');
+        }
+        
+        // Prepare UTXO data for deposit
+        if (!currentOrdinal.txid || currentOrdinal.vout === undefined) {
+          throw new Error('Missing UTXO information (txid or vout).');
+        }
+        
+        const utxoData = {
+          txid: currentOrdinal.txid,
+          vout: currentOrdinal.vout,
+          amount: BigInt(currentOrdinal.satoshiValue),
+          address: btcAddress || 'tb1qsmsy4wjhcwts9z9wg6mq3025x2tk4y03dtjslq',
+        };
+        
+        console.log('📤 Depositing UTXO to backend:', utxoData);
+        try {
+          const newUtxoId = await depositUtxo(utxoData);
+          console.log('✅ UTXO deposited successfully! UTXO ID:', newUtxoId);
+          
+          // Update currentOrdinal with the new UTXO ID
+          const updatedOrdinal = {
+            ...currentOrdinal,
+            utxoId: newUtxoId
+          };
+          setCurrentOrdinal(updatedOrdinal);
+          setUtxoId(newUtxoId);
+          finalUtxoId = newUtxoId;
+        } catch (depositError: unknown) {
+          const depositErr = depositError as { message?: string };
+          if (depositErr.message?.includes('Not authenticated') || depositErr.message?.includes('Authentication failed')) {
+            throw new Error('Authentication failed. Please reconnect Internet Identity and try again.');
+          }
+          throw depositError;
+        }
+      }
+      
+      // Now lock the collateral
+      console.log('🔒 Locking UTXO as collateral:', finalUtxoId);
+      try {
+        const loanOffer = await lockCollateral(finalUtxoId);
+        console.log('✅ Collateral locked successfully! Loan Offer:', loanOffer);
+        
+        // Navigate to offer page
+        navigate('/offer');
+      } catch (lockError: unknown) {
+        const lockErr = lockError as { message?: string };
+        if (lockErr.message?.includes('Not authenticated') || lockErr.message?.includes('Authentication failed')) {
+          throw new Error('Authentication failed. Please reconnect Internet Identity and try again.');
+        }
+        throw lockError;
+      }
+    } catch (error: unknown) {
+      const err = error as { message?: string };
       console.error('❌ Failed to lock ordinal:', error);
-      setError(error.message || 'Failed to lock ordinal. Please try again.');
+      setError(err.message || 'Failed to lock ordinal. Please try again.');
     } finally {
       setIsLocking(false);
     }

@@ -8,9 +8,12 @@ let vaultActor: _SERVICE | null = null;
  * Initialize vault actor
  */
 async function getVaultActor(): Promise<_SERVICE> {
-  if (vaultActor) return vaultActor;
+  // For update calls, require authentication
+  // Always reinitialize to ensure we have the latest identity
+  // This is important after login/logout
+  await initAgent(true); // requireAuth = true for update calls
   
-  await initAgent();
+  // Create new actor with fresh agent (in case identity changed)
   vaultActor = createActor<_SERVICE>(getVaultCanisterId(), idlFactory);
   return vaultActor;
 }
@@ -86,20 +89,37 @@ export async function depositUtxo(request: {
  * Borrow ckBTC against collateral
  */
 export async function borrow(utxoId: bigint, amount: bigint): Promise<bigint> {
-  const actor = await getVaultActor();
-  
-  const borrowRequest: BorrowRequest = {
-    utxo_id: utxoId,
-    amount,
-  };
+  try {
+    const actor = await getVaultActor();
+    
+    if (!actor) {
+      throw new Error('Vault actor not initialized. Please connect Internet Identity first.');
+    }
+    
+    const borrowRequest: BorrowRequest = {
+      utxo_id: utxoId,
+      amount,
+    };
 
-  const result = await actor.borrow(borrowRequest);
-  
-  if ('Err' in result) {
-    throw new Error(result.Err);
+    console.log('📤 [vaultService] Calling borrow with request:', {
+      utxo_id: borrowRequest.utxo_id.toString(),
+      amount: borrowRequest.amount.toString(),
+      amount_ckbtc: (Number(borrowRequest.amount) / 100000000).toFixed(8)
+    });
+
+    const result = await actor.borrow(borrowRequest);
+    
+    if ('Err' in result) {
+      console.error('❌ [vaultService] Borrow error:', result.Err);
+      throw new Error(result.Err);
+    }
+    
+    console.log('✅ [vaultService] Borrow successful! Loan ID:', result.Ok.toString());
+    return result.Ok;
+  } catch (error: any) {
+    console.error('❌ [vaultService] Borrow exception:', error);
+    throw error;
   }
-  
-  return result.Ok;
 }
 
 /**
@@ -174,4 +194,117 @@ export async function getLoan(loanId: bigint): Promise<Loan | null> {
   const actor = await getVaultActor();
   const result = await actor.get_loan(loanId);
   return result.length > 0 ? result[0] : null;
+}
+
+/**
+ * Lock a deposited UTXO as collateral and create a loan offer
+ */
+export async function lockCollateral(utxoId: bigint): Promise<{
+  id: bigint;
+  user_id: string;
+  utxo_id: bigint;
+  max_borrowable: bigint;
+  ltv_percent: number;
+  status: { Active?: {}; Accepted?: {}; Expired?: {}; Cancelled?: {} };
+  created_at: bigint;
+}> {
+  try {
+    const actor = await getVaultActor();
+    
+    if (!actor) {
+      throw new Error('Vault actor not initialized. Please connect Internet Identity first.');
+    }
+    
+    console.log('📤 Calling lock_collateral with UTXO ID:', utxoId);
+    
+    // Call with proper Candid format (just the number)
+    const result = await actor.lock_collateral(utxoId);
+    
+    if ('Err' in result) {
+      throw new Error(result.Err);
+    }
+    
+    console.log('✅ lock_collateral successful! Loan Offer:', result.Ok);
+    return result.Ok;
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    console.error('❌ lockCollateral error:', error);
+    
+    if (err.message?.includes('403') || err.message?.includes('Forbidden')) {
+      throw new Error('Authentication failed. Please connect Internet Identity and try again.');
+    } else if (err.message?.includes('404') || err.message?.includes('Not Found')) {
+      throw new Error('Vault canister not found. Please make sure the canister is deployed.');
+    } else if (err.message?.includes('certificate') || err.message?.includes('signature')) {
+      throw new Error('Certificate verification failed. Please check your Internet Identity connection.');
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Get loan offer for a specific UTXO
+ */
+export async function getLoanOfferByUtxo(utxoId: bigint): Promise<{
+  id: bigint;
+  user_id: string;
+  utxo_id: bigint;
+  max_borrowable: bigint;
+  ltv_percent: number;
+  status: { Active?: {}; Accepted?: {}; Expired?: {}; Cancelled?: {} };
+  created_at: bigint;
+} | null> {
+  try {
+    const actor = await getVaultActor();
+    if (!actor) {
+      throw new Error('Vault actor not initialized. Please connect Internet Identity first.');
+    }
+    
+    // Check if the method exists (it might not be in the current declarations)
+    if ('get_loan_offer_by_utxo' in actor) {
+      const result = await (actor as any).get_loan_offer_by_utxo(utxoId);
+      return result.length > 0 ? result[0] : null;
+    }
+    
+    // Fallback: get all user loan offers and find the one for this UTXO
+    if ('get_user_loan_offers' in actor) {
+      const offers = await (actor as any).get_user_loan_offers();
+      return offers.find((offer: any) => offer.utxo_id === utxoId && offer.status?.Active !== undefined) || null;
+    }
+    
+    return null;
+  } catch (error: any) {
+    console.error('Error getting loan offer:', error);
+    return null;
+  }
+}
+
+/**
+ * Get all loan offers for the current user
+ */
+export async function getUserLoanOffers(): Promise<Array<{
+  id: bigint;
+  user_id: string;
+  utxo_id: bigint;
+  max_borrowable: bigint;
+  ltv_percent: number;
+  status: { Active?: {}; Accepted?: {}; Expired?: {}; Cancelled?: {} };
+  created_at: bigint;
+}>> {
+  try {
+    const actor = await getVaultActor();
+    if (!actor) {
+      throw new Error('Vault actor not initialized. Please connect Internet Identity first.');
+    }
+    
+    // Check if the method exists
+    if ('get_user_loan_offers' in actor) {
+      return await (actor as any).get_user_loan_offers();
+    }
+    
+    return [];
+  } catch (error: any) {
+    console.error('Error getting user loan offers:', error);
+    return [];
+  }
 }

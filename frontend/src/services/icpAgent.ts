@@ -17,28 +17,54 @@ let identity: any = null;
 /**
  * Initialize the ICP agent
  */
-export async function initAgent(): Promise<HttpAgent> {
-  if (agent) return agent;
-
-  // Create auth client
-  authClient = await AuthClient.create();
+export async function initAgent(requireAuth: boolean = false): Promise<HttpAgent> {
+  const isLocal = import.meta.env.VITE_DFX_NETWORK !== 'ic';
+  
+  // Always create/refresh auth client to get latest identity
+  if (!authClient) {
+    authClient = await AuthClient.create();
+  }
+  
+  // Get current identity (may be anonymous if not authenticated)
   identity = authClient.getIdentity();
+  
+  // Check if authenticated
+  const authenticated = await authClient.isAuthenticated();
+  
+  if (!authenticated) {
+    if (isLocal && !requireAuth) {
+      // For local development, use anonymous identity for queries
+      console.log('ℹ️ Using anonymous identity for local development (queries only)');
+      const { AnonymousIdentity } = await import('@dfinity/agent');
+      identity = new AnonymousIdentity();
+    } else {
+      // For production or when auth is required, throw error
+      console.warn('⚠️ Not authenticated. Please connect Internet Identity first.');
+      throw new Error('Not authenticated. Please connect Internet Identity first.');
+    }
+  }
+  
+  // If agent exists and authenticated, return it (unless identity changed)
+  if (agent && authenticated) {
+    return agent;
+  }
 
-  // Create agent with proper configuration for local development
+  // Create new agent with current identity
   agent = new HttpAgent({
     host: HOST,
     identity,
     verifyQuerySignatures: false, // Disable query signature verification for local dev
   });
   
-  // For local development, we need to handle certificate verification differently
-  if (import.meta.env.VITE_DFX_NETWORK !== 'ic') {
-    // Disable certificate verification for local replica (development only)
+  // For local development, disable all signature verification
+  if (isLocal) {
     (agent as any)._verifyQuerySignatures = false;
+    // Disable certificate verification for local replica
+    (agent as any).rootKey = null;
   }
 
   // Fetch root key for local development
-  if (import.meta.env.VITE_DFX_NETWORK !== 'ic') {
+  if (isLocal) {
     try {
       await agent.fetchRootKey();
       console.log('✅ Root key fetched successfully');
@@ -91,32 +117,30 @@ export async function isAuthenticated(): Promise<boolean> {
  * Login with Internet Identity
  */
 export async function login(): Promise<void> {
-  if (!authClient) {
-    authClient = await AuthClient.create();
+  // IMPORTANT: Clear old auth client to remove stale mainnet II credentials
+  if (authClient) {
+    await authClient.logout();
+    authClient = null;
   }
+  
+  // Create fresh auth client
+  authClient = await AuthClient.create();
 
   return new Promise((resolve, reject) => {
-    // For local development, use mainnet Internet Identity (easier setup)
-    // If you have local II canister, set VITE_INTERNET_IDENTITY_CANISTER_ID
     let identityProvider: string;
     
     if (import.meta.env.VITE_DFX_NETWORK === 'ic') {
       // Production: use mainnet Internet Identity
       identityProvider = 'https://identity.ic0.app';
     } else {
-      // Local development: use mainnet Internet Identity by default
-      // This works because II is public and can authenticate for local canisters
-      const localCanisterId = import.meta.env.VITE_INTERNET_IDENTITY_CANISTER_ID;
+      // Local development: MUST use local Internet Identity
+      // Using mainnet II with local replica causes signature verification failures
+      const localCanisterId = import.meta.env.VITE_INTERNET_IDENTITY_CANISTER_ID || 'bw4dl-smaaa-aaaaa-qaacq-cai';
       
-      if (localCanisterId) {
-        // If local canister ID is provided, use it
-        identityProvider = `http://127.0.0.1:4943/?canisterId=${localCanisterId}`;
-        console.log(`ℹ️ Using local Internet Identity: ${localCanisterId}`);
-      } else {
-        // Default: use mainnet Internet Identity (works for local dev)
-        identityProvider = 'https://identity.ic0.app';
-        console.log('ℹ️ Using mainnet Internet Identity for local development');
-      }
+      identityProvider = `http://${localCanisterId}.localhost:4943`;
+      console.log(`ℹ️ Using local Internet Identity: ${identityProvider}`);
+      console.log('💡 If this fails, make sure Internet Identity is deployed locally:');
+      console.log('   dfx deploy internet_identity');
     }
     
     authClient!.login({
@@ -124,26 +148,33 @@ export async function login(): Promise<void> {
       onSuccess: async () => {
         try {
           identity = authClient!.getIdentity();
+          // Reset agent to force reinitialization with new identity
+          agent = null;
           // Reinitialize agent with new identity
-          agent = new HttpAgent({
-            host: HOST,
-            identity,
-          });
-          if (import.meta.env.VITE_DFX_NETWORK !== 'ic') {
-            await agent.fetchRootKey();
-          }
+          await initAgent();
           resolve();
         } catch (error) {
           reject(error);
         }
       },
-      onError: (error) => {
+      onError: (error: any) => {
         // Handle user cancellation gracefully
-        if (error.name === 'UserInterrupt' || error.message?.includes('UserInterrupt')) {
+        const errorName = error?.name || error?.toString() || '';
+        const errorMessage = error?.message || error?.toString() || '';
+        
+        if (
+          errorName === 'UserInterrupt' || 
+          errorName === 'UserCancelled' ||
+          errorMessage.includes('UserInterrupt') || 
+          errorMessage.includes('User cancelled') ||
+          errorMessage.includes('UserCancelled')
+        ) {
           const cancelError = new Error('User cancelled Internet Identity connection');
           cancelError.name = 'UserCancelled';
+          console.log('ℹ️ User cancelled Internet Identity connection');
           reject(cancelError);
         } else {
+          console.error('Internet Identity login error:', error);
           reject(error);
         }
       },
@@ -159,6 +190,47 @@ export async function logout(): Promise<void> {
   await authClient.logout();
   identity = null;
   agent = null;
+}
+
+/**
+ * Clear all stored authentication data
+ * Use this to fix authentication issues with stale credentials
+ */
+export async function clearAuth(): Promise<void> {
+  console.log('🧹 Clearing all authentication data...');
+  
+  // Logout if auth client exists
+  if (authClient) {
+    await authClient.logout();
+  }
+  
+  // Clear all state
+  authClient = null;
+  identity = null;
+  agent = null;
+  
+  // Clear IndexedDB storage used by auth-client
+  try {
+    const databases = await indexedDB.databases();
+    for (const db of databases) {
+      if (db.name?.includes('ic-') || db.name?.includes('auth')) {
+        console.log(`🗑️ Deleting database: ${db.name}`);
+        indexedDB.deleteDatabase(db.name);
+      }
+    }
+  } catch (err) {
+    console.warn('Could not clear IndexedDB:', err);
+  }
+  
+  // Clear localStorage
+  Object.keys(localStorage).forEach(key => {
+    if (key.includes('ic-') || key.includes('identity') || key.includes('delegation')) {
+      console.log(`🗑️ Removing localStorage key: ${key}`);
+      localStorage.removeItem(key);
+    }
+  });
+  
+  console.log('✅ Authentication data cleared. Please refresh and reconnect.');
 }
 
 /**

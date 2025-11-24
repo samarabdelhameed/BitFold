@@ -72,6 +72,82 @@ pub async fn deposit_utxo(request: DepositUtxoRequest) -> Result<UtxoId, String>
     Ok(utxo_id)
 }
 
+/// Locks a deposited UTXO as collateral and creates a loan offer
+#[ic_cdk::update]
+pub async fn lock_collateral(utxo_id: UtxoId) -> Result<LoanOffer, String> {
+    let caller = ic_cdk::api::caller();
+    
+    // Get UTXO
+    let utxo = State::with_read(|state| {
+        state.utxos.get(&utxo_id).cloned()
+    });
+    
+    let utxo = utxo.ok_or("UTXO not found".to_string())?;
+    
+    // Check UTXO belongs to caller
+    let user_utxos = State::with_read(|state| {
+        state.user_utxos.get(&caller).cloned()
+    });
+    
+    if !user_utxos.map(|utxos| utxos.contains(&utxo_id)).unwrap_or(false) {
+        return Err("Unauthorized: UTXO does not belong to caller".to_string());
+    }
+    
+    // Check UTXO is not already locked
+    if utxo.status != UtxoStatus::Deposited {
+        return Err("UTXO is already locked or withdrawn".to_string());
+    }
+    
+    // Calculate max borrowable (50% LTV = 5000 basis points)
+    let max_borrowable = calculate_max_borrowable(&utxo, 5000);
+    
+    // Lock UTXO and create loan offer
+    let created_at = get_timestamp();
+    let loan_offer_id = State::with(|state| {
+        // Lock UTXO
+        if let Some(utxo) = state.utxos.get_mut(&utxo_id) {
+            utxo.status = UtxoStatus::Locked;
+        }
+        
+        // Create loan offer
+        let offer_id = state.next_loan_offer_id;
+        state.next_loan_offer_id += 1;
+        
+        let offer = LoanOffer {
+            id: offer_id,
+            user_id: caller,
+            utxo_id,
+            max_borrowable,
+            ltv_percent: 50, // 50% LTV
+            status: LoanOfferStatus::Active,
+            created_at,
+        };
+        
+        state.loan_offers.insert(offer_id, offer.clone());
+        state.user_loan_offers
+            .entry(caller)
+            .or_insert_with(Vec::new)
+            .push(offer_id);
+        
+        ic_cdk::println!(
+            "Locked UTXO {} for user {} and created loan offer {}: max borrowable {} satoshis",
+            utxo_id, caller, offer_id, max_borrowable
+        );
+        
+        offer_id
+    });
+    
+    Ok(LoanOffer {
+        id: loan_offer_id,
+        user_id: caller,
+        utxo_id,
+        max_borrowable,
+        ltv_percent: 50,
+        status: LoanOfferStatus::Active,
+        created_at,
+    })
+}
+
 /// Borrows ckBTC against deposited collateral
 #[ic_cdk::update]
 pub async fn borrow(request: BorrowRequest) -> Result<LoanId, String> {
@@ -98,13 +174,41 @@ pub async fn borrow(request: BorrowRequest) -> Result<LoanId, String> {
         return Err("Unauthorized: UTXO does not belong to caller".to_string());
     }
     
-    // Check UTXO is not already locked
-    if utxo.status != UtxoStatus::Deposited {
-        return Err("UTXO is already locked or withdrawn".to_string());
+    // Check if UTXO is withdrawn (cannot borrow against withdrawn UTXO)
+    if utxo.status == UtxoStatus::Withdrawn {
+        return Err("UTXO has been withdrawn".to_string());
     }
     
-    // Calculate max borrowable (50% LTV = 5000 basis points)
-    let max_borrowable = calculate_max_borrowable(&utxo, 5000);
+    // If UTXO is Locked, check if there's an active loan offer
+    let max_borrowable = if utxo.status == UtxoStatus::Locked {
+        // Check for active loan offer
+        let loan_offer = State::with_read(|state| {
+            state.user_loan_offers
+                .get(&caller)
+                .and_then(|offer_ids| {
+                    offer_ids.iter().find_map(|offer_id| {
+                        state.loan_offers.get(offer_id).and_then(|offer| {
+                            if offer.utxo_id == request.utxo_id && offer.status == LoanOfferStatus::Active {
+                                Some(offer.max_borrowable)
+                            } else {
+                                None
+                            }
+                        })
+                    })
+                })
+        });
+        
+        match loan_offer {
+            Some(max) => max,
+            None => {
+                return Err("UTXO is locked but no active loan offer found. Please create a loan offer first.".to_string());
+            }
+        }
+    } else {
+        // UTXO is Deposited, calculate max borrowable (50% LTV = 5000 basis points)
+        calculate_max_borrowable(&utxo, 5000)
+    };
+    
     if request.amount > max_borrowable {
         return Err(format!(
             "Amount {} exceeds maximum borrowable: {} (50% LTV)",
@@ -142,9 +246,26 @@ pub async fn borrow(request: BorrowRequest) -> Result<LoanId, String> {
             .or_insert_with(Vec::new)
             .push(id);
         
-        // Lock UTXO as collateral
+        // Lock UTXO as collateral (if not already locked)
         if let Some(utxo) = state.utxos.get_mut(&request.utxo_id) {
-            utxo.status = UtxoStatus::Locked;
+            if utxo.status == UtxoStatus::Deposited {
+                utxo.status = UtxoStatus::Locked;
+            }
+        }
+        
+        // Mark loan offer as accepted if it exists
+        if let Some(offer_ids) = state.user_loan_offers.get(&caller) {
+            for offer_id in offer_ids {
+                if let Some(offer) = state.loan_offers.get_mut(offer_id) {
+                    if offer.utxo_id == request.utxo_id && offer.status == LoanOfferStatus::Active {
+                        offer.status = LoanOfferStatus::Accepted;
+                        ic_cdk::println!(
+                            "Marked loan offer {} as accepted for loan {}",
+                            offer_id, id
+                        );
+                    }
+                }
+            }
         }
         
         ic_cdk::println!(
@@ -342,6 +463,47 @@ pub fn get_loan(loan_id: LoanId) -> Option<Loan> {
 #[ic_cdk::query]
 pub fn get_utxo(utxo_id: UtxoId) -> Option<UTXO> {
     State::with_read(|state| state.utxos.get(&utxo_id).cloned())
+}
+
+/// Gets loan offer for a specific UTXO
+#[ic_cdk::query]
+pub fn get_loan_offer_by_utxo(utxo_id: UtxoId) -> Option<LoanOffer> {
+    let caller = ic_cdk::api::caller();
+    
+    State::with_read(|state| {
+        // Find loan offer for this UTXO that belongs to the caller
+        state.user_loan_offers
+            .get(&caller)
+            .and_then(|offer_ids| {
+                offer_ids.iter().find_map(|offer_id| {
+                    state.loan_offers.get(offer_id).and_then(|offer| {
+                        if offer.utxo_id == utxo_id && offer.status == LoanOfferStatus::Active {
+                            Some(offer.clone())
+                        } else {
+                            None
+                        }
+                    })
+                })
+            })
+    })
+}
+
+/// Gets all loan offers for the caller
+#[ic_cdk::query]
+pub fn get_user_loan_offers() -> Vec<LoanOffer> {
+    let caller = ic_cdk::api::caller();
+    
+    State::with_read(|state| {
+        state.user_loan_offers
+            .get(&caller)
+            .map(|offer_ids| {
+                offer_ids
+                    .iter()
+                    .filter_map(|id| state.loan_offers.get(id).cloned())
+                    .collect()
+            })
+            .unwrap_or_default()
+    })
 }
 
 

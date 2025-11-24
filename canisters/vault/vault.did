@@ -75,8 +75,31 @@ type Result = variant {
   Err : text;
 };
 
+type LoanOfferStatus = variant {
+  Active;
+  Accepted;
+  Expired;
+  Cancelled;
+};
+
+type LoanOffer = record {
+  id : nat64;
+  user_id : principal;
+  utxo_id : UtxoId;
+  max_borrowable : nat64;
+  ltv_percent : nat64;
+  status : LoanOfferStatus;
+  created_at : nat64;
+};
+
+type Result_LoanOffer = variant {
+  Ok : LoanOffer;
+  Err : text;
+};
+
 service : {
   "deposit_utxo" : (DepositUtxoRequest) -> (Result_UtxoId);
+  "lock_collateral" : (UtxoId) -> (Result_LoanOffer);
   "borrow" : (BorrowRequest) -> (Result_LoanId);
   "repay" : (RepayRequest) -> (Result);
   "withdraw_collateral" : (UtxoId) -> (Result);

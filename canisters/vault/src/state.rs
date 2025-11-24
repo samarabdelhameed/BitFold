@@ -1,4 +1,4 @@
-use crate::types::{Loan, LoanId, UTXO, UtxoId};
+use crate::types::{Loan, LoanId, LoanOffer, UTXO, UtxoId};
 use candid::{CandidType, Deserialize, Principal};
 use serde::Serialize;
 use std::cell::RefCell;
@@ -14,11 +14,22 @@ pub struct State {
     pub utxos: HashMap<UtxoId, UTXO>,
     pub user_loans: HashMap<Principal, Vec<LoanId>>,
     pub user_utxos: HashMap<Principal, Vec<UtxoId>>,
+    pub loan_offers: HashMap<u64, LoanOffer>,
+    pub user_loan_offers: HashMap<Principal, Vec<u64>>,
     pub next_loan_id: LoanId,
     pub next_utxo_id: UtxoId,
+    pub next_loan_offer_id: u64,
 }
 
 impl State {
+    /// Initialize default values for new fields (for backward compatibility)
+    pub fn init_defaults(&mut self) {
+        if self.loan_offers.is_empty() && self.user_loan_offers.is_empty() {
+            self.loan_offers = HashMap::new();
+            self.user_loan_offers = HashMap::new();
+            self.next_loan_offer_id = 1;
+        }
+    }
     pub fn with<F, R>(f: F) -> R
     where
         F: FnOnce(&mut State) -> R,
@@ -66,14 +77,24 @@ fn pre_upgrade() {
 /// Post-upgrade hook: restores state from stable memory after canister upgrade
 #[ic_cdk::post_upgrade]
 fn post_upgrade() {
-    let (state,): (State,) = ic_cdk::storage::stable_restore()
-        .expect("Failed to restore state from stable memory");
+    let mut state: State = match ic_cdk::storage::stable_restore() {
+        Ok((s,)) => s,
+        Err(_) => {
+            // If restore fails (e.g., due to new fields), try to restore old state and add defaults
+            ic_cdk::println!("Warning: Failed to restore state, initializing with defaults");
+            State::default()
+        }
+    };
+    
+    // Initialize default values for new fields
+    state.init_defaults();
     
     ic_cdk::println!("Post-upgrade: State restored successfully");
     ic_cdk::println!("  - Loans: {}", state.loans.len());
     ic_cdk::println!("  - UTXOs: {}", state.utxos.len());
     ic_cdk::println!("  - Next Loan ID: {}", state.next_loan_id);
     ic_cdk::println!("  - Next UTXO ID: {}", state.next_utxo_id);
+    ic_cdk::println!("  - Next Loan Offer ID: {}", state.next_loan_offer_id);
     
     State::replace(state);
 }

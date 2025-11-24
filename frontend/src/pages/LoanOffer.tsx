@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { TrendingUp, AlertTriangle } from 'lucide-react';
-import { borrow } from '../services/vaultService';
+import { borrow, getLoanOfferByUtxo, getUtxo } from '../services/vaultService';
 
 export function LoanOffer() {
   const navigate = useNavigate();
@@ -11,25 +11,100 @@ export function LoanOffer() {
   const [amount, setAmount] = useState('');
   const [displayedLtv, setDisplayedLtv] = useState(0);
   const [displayedMax, setDisplayedMax] = useState(0);
+  const [maxAmount, setMaxAmount] = useState(0.001); // Default fallback
+  const [maxLtv, setMaxLtv] = useState(50); // Default fallback
   const [isBorrowing, setIsBorrowing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const maxLtv = 50;
-  const maxAmount = 0.001;
-
+  // Load real data from canister
   useEffect(() => {
-    const ltvInterval = setInterval(() => {
-      setDisplayedLtv(prev => (prev < maxLtv ? prev + 1 : prev));
-    }, 20);
+    const loadLoanOfferData = async () => {
+      if (!currentOrdinal?.utxoId) {
+        setIsLoading(false);
+        return;
+      }
 
-    const amountInterval = setInterval(() => {
-      setDisplayedMax(prev => (prev < maxAmount ? prev + 0.00001 : maxAmount));
-    }, 20);
+      try {
+        console.log('📥 Loading loan offer data for UTXO:', currentOrdinal.utxoId);
+        
+        // Try to get loan offer first
+        const loanOffer = await getLoanOfferByUtxo(currentOrdinal.utxoId);
+        
+        if (loanOffer) {
+          // Convert satoshis to ckBTC (1 ckBTC = 100,000,000 satoshis)
+          const maxBorrowableCkBTC = Number(loanOffer.max_borrowable) / 100000000;
+          const ltvPercent = Number(loanOffer.ltv_percent);
+          
+          console.log('✅ Loan offer found:', {
+            max_borrowable_sats: loanOffer.max_borrowable.toString(),
+            max_borrowable_ckbtc: maxBorrowableCkBTC,
+            ltv_percent: ltvPercent
+          });
+          
+          setMaxAmount(maxBorrowableCkBTC);
+          setMaxLtv(ltvPercent);
+          
+          // Animate to real values
+          const ltvInterval = setInterval(() => {
+            setDisplayedLtv(prev => (prev < ltvPercent ? prev + 1 : ltvPercent));
+          }, 20);
 
-    return () => {
-      clearInterval(ltvInterval);
-      clearInterval(amountInterval);
+          const amountInterval = setInterval(() => {
+            setDisplayedMax(prev => {
+              const next = prev + 0.00001;
+              return next < maxBorrowableCkBTC ? next : maxBorrowableCkBTC;
+            });
+          }, 20);
+
+          // Set initial amount to half of max
+          setAmount((maxBorrowableCkBTC / 2).toFixed(4));
+
+          setTimeout(() => {
+            clearInterval(ltvInterval);
+            clearInterval(amountInterval);
+          }, 2000);
+        } else {
+          // Fallback: get UTXO and calculate max borrowable (50% LTV)
+          console.log('⚠️ No loan offer found, calculating from UTXO...');
+          const utxo = await getUtxo(currentOrdinal.utxoId);
+          
+          if (utxo) {
+            const maxBorrowableSats = (Number(utxo.amount) * 5000) / 10000; // 50% LTV
+            const maxBorrowableCkBTC = maxBorrowableSats / 100000000;
+            
+            setMaxAmount(maxBorrowableCkBTC);
+            setMaxLtv(50);
+            
+            // Animate to calculated values
+            const ltvInterval = setInterval(() => {
+              setDisplayedLtv(prev => (prev < 50 ? prev + 1 : 50));
+            }, 20);
+
+            const amountInterval = setInterval(() => {
+              setDisplayedMax(prev => {
+                const next = prev + 0.00001;
+                return next < maxBorrowableCkBTC ? next : maxBorrowableCkBTC;
+              });
+            }, 20);
+
+            setAmount((maxBorrowableCkBTC / 2).toFixed(4));
+
+            setTimeout(() => {
+              clearInterval(ltvInterval);
+              clearInterval(amountInterval);
+            }, 2000);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error loading loan offer data:', error);
+        // Keep default values
+      } finally {
+        setIsLoading(false);
+      }
     };
-  }, []);
+
+    loadLoanOfferData();
+  }, [currentOrdinal?.utxoId]);
 
   if (!currentOrdinal) {
     navigate('/scan');
@@ -49,18 +124,33 @@ export function LoanOffer() {
         throw new Error('UTXO ID not found. Please scan your Ordinal again.');
       }
       
-      // Convert BTC to satoshis
+      // Convert ckBTC to satoshis (1 ckBTC = 100,000,000 satoshis)
       const amountInSats = BigInt(Math.floor(borrowAmount * 100000000));
       
       // Get UTXO ID from currentOrdinal (set during deposit_utxo)
       const utxoId = currentOrdinal.utxoId;
       
-      console.log('📤 Calling borrow with:', { utxoId, amountInSats, utxo: currentOrdinal.utxo });
+      console.log('📤 ========================================');
+      console.log('📤 Starting Borrow Process');
+      console.log('📤 ========================================');
+      console.log('📤 UTXO ID:', utxoId.toString());
+      console.log('📤 Borrow Amount (ckBTC):', borrowAmount);
+      console.log('📤 Borrow Amount (satoshis):', amountInSats.toString());
+      console.log('📤 Max Available (ckBTC):', maxAmount);
+      console.log('📤 Max Available (satoshis):', (maxAmount * 100000000).toString());
+      console.log('📤 LTV:', maxLtv + '%');
+      console.log('📤 Calling borrow function...');
       
       // Call backend to borrow (this will lock the collateral automatically)
       const loanId = await borrow(utxoId, amountInSats);
       
-      console.log('✅ borrow successful! Loan ID:', loanId);
+      console.log('✅ ========================================');
+      console.log('✅ Borrow Successful!');
+      console.log('✅ ========================================');
+      console.log('✅ Loan ID:', loanId.toString());
+      console.log('✅ Borrowed Amount:', amountInSats.toString(), 'satoshis');
+      console.log('✅ Borrowed Amount:', borrowAmount, 'ckBTC');
+      console.log('✅ Next: Check ckBTC balance in wallet');
 
       const newLoan = {
         id: loanId.toString(),
@@ -76,7 +166,12 @@ export function LoanOffer() {
       addLoan(newLoan);
       navigate('/borrow-success');
     } catch (err: any) {
-      console.error('Borrow failed:', err);
+      console.error('❌ ========================================');
+      console.error('❌ Borrow Failed!');
+      console.error('❌ ========================================');
+      console.error('❌ Error:', err);
+      console.error('❌ Error Message:', err.message);
+      console.error('❌ Full Error:', JSON.stringify(err, null, 2));
       alert(err.message || 'Failed to borrow. Please try again.');
       setIsBorrowing(false);
     }

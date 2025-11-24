@@ -13,7 +13,7 @@ const btcWallets = [
 
 export function ConnectWallet() {
   const navigate = useNavigate();
-  const { setPrincipal, setBtcAddress, icpLogin, isIcpAuthenticated } = useApp();
+  const { setBtcAddress, icpLogin, isIcpAuthenticated } = useApp();
   const [selectedBtc, setSelectedBtc] = useState<string | null>(null);
   const [isConnectingBtc, setIsConnectingBtc] = useState<string | null>(null);
   const [isConnectingIcp, setIsConnectingIcp] = useState(false);
@@ -99,9 +99,10 @@ export function ConnectWallet() {
             } else {
               throw new Error('No accounts found in UniSat wallet.');
             }
-          } catch (error: any) {
+          } catch (error: unknown) {
+            const err = error as { message?: string };
             console.error('UniSat connection error:', error);
-            throw new Error(error.message || 'Failed to connect to UniSat wallet. Please approve the connection request.');
+            throw new Error(err.message || 'Failed to connect to UniSat wallet. Please approve the connection request.');
           }
         } else {
           throw new Error('Unisat wallet not found. Please install Unisat extension from https://unisat.io');
@@ -122,9 +123,10 @@ export function ConnectWallet() {
             } else {
               throw new Error('No accounts found in Xverse wallet.');
             }
-          } catch (error: any) {
+          } catch (error: unknown) {
+            const err = error as { message?: string };
             console.error('Xverse connection error:', error);
-            throw new Error(error.message || 'Failed to connect to Xverse wallet. Please approve the connection request.');
+            throw new Error(err.message || 'Failed to connect to Xverse wallet. Please approve the connection request.');
           }
         } else {
           throw new Error('Xverse wallet not found. Please install Xverse extension.');
@@ -149,9 +151,10 @@ export function ConnectWallet() {
             } else {
               throw new Error('No accounts found in Magic Eden wallet.');
             }
-          } catch (error: any) {
+          } catch (error: unknown) {
+            const err = error as { message?: string };
             console.error('Magic Eden connection error:', error);
-            throw new Error(error.message || 'Failed to connect to Magic Eden wallet. Please approve the connection request.');
+            throw new Error(err.message || 'Failed to connect to Magic Eden wallet. Please approve the connection request.');
           }
         } else {
           throw new Error('Magic Eden wallet not found. Please install Magic Eden extension.');
@@ -223,9 +226,10 @@ export function ConnectWallet() {
           navigate('/scan');
         }, 1000);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string };
       console.error(`Failed to connect ${walletId}:`, error);
-      setBtcError(error.message || `Failed to connect ${walletId} wallet. Please make sure the extension is installed.`);
+      setBtcError(err.message || `Failed to connect ${walletId} wallet. Please make sure the extension is installed.`);
       setConnectionStatus(`❌ Failed to connect Bitcoin wallet. Please try again.`);
       setTimeout(() => setConnectionStatus(null), 5000);
     } finally {
@@ -258,18 +262,30 @@ export function ConnectWallet() {
           navigate('/scan');
         }, 1000);
       }
-    } catch (error: any) {
-      console.error('Failed to connect Internet Identity:', error);
+    } catch (error: unknown) {
+      const err = error as { name?: string; message?: string; toString?: () => string };
+      console.error('ICP login failed:', error);
       
-      // Handle user cancellation gracefully
-      if (error?.name === 'UserCancelled' || error?.message?.includes('UserInterrupt') || error?.message?.includes('User cancelled')) {
-        console.log('ℹ️ User cancelled Internet Identity connection');
+      // Handle user cancellation gracefully - don't show error
+      const errorName = err.name || '';
+      const errorMessage = err.message || err.toString?.() || '';
+      
+      if (
+        errorName === 'UserCancelled' || 
+        errorName === 'UserInterrupt' ||
+        errorMessage.includes('UserInterrupt') || 
+        errorMessage.includes('User cancelled') ||
+        errorMessage.includes('UserCancelled')
+      ) {
+        console.log('ℹ️ User cancelled Internet Identity connection - this is okay');
         setConnectionStatus(null);
+        setIcpError(null); // Clear any previous errors
         // Don't show error for user cancellation
         return;
       }
       
       // Show error for other failures
+      console.error('Failed to connect Internet Identity:', error);
       setIcpError('Failed to connect Internet Identity. Please try again.');
       setConnectionStatus('❌ Failed to connect Internet Identity. Please try again.');
       setTimeout(() => setConnectionStatus(null), 5000);
@@ -454,6 +470,23 @@ export function ConnectWallet() {
                 without passwords or personal information.
               </p>
             </div>
+
+            {/* Clear Auth Button - for fixing authentication issues */}
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={async () => {
+                if (confirm('This will clear all stored authentication data. You will need to reconnect. Continue?')) {
+                  const { clearAuth } = await import('../services/icpAgent');
+                  await clearAuth();
+                  alert('Authentication data cleared! Please refresh the page and reconnect.');
+                  window.location.reload();
+                }
+              }}
+              className="mt-4 w-full py-2 px-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm font-medium hover:bg-yellow-500/20 transition-all"
+            >
+              🧹 Clear Auth Data (Fix Connection Issues)
+            </motion.button>
           </motion.div>
         </div>
 

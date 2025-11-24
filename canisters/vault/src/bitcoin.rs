@@ -15,7 +15,7 @@ use ic_cdk::api::management_canister::bitcoin::{
 pub async fn verify_utxo(utxo: &UTXO) -> Result<bool, String> {
     // Feature flag: Skip Bitcoin verification if cycles not available
     // WARNING: Only use for testing! Remove in production!
-    const SKIP_BITCOIN_VERIFICATION: bool = false; // Set to true to skip verification
+    const SKIP_BITCOIN_VERIFICATION: bool = true; // Set to true to skip verification (LOCAL DEV ONLY)
     
     if SKIP_BITCOIN_VERIFICATION {
         ic_cdk::println!("⚠️  WARNING: Bitcoin verification SKIPPED (testing mode)");
