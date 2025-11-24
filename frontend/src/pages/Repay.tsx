@@ -57,6 +57,41 @@ export function Repay() {
     return !isNaN(repayAmount) && repayAmount > 0 && repayAmount <= loan.remainingAmount;
   };
 
+  // Calculate progress correctly based on original borrowed amount (without interest)
+  // Repaid % = (Amount paid / Original borrowed) × 100
+  // Amount paid = Original borrowed - (Remaining - Interest)
+  const calculateProgress = () => {
+    if (loan.borrowedAmount === 0) {
+      return { repaid: 0, remaining: 100 };
+    }
+
+    // Calculate the remaining principal (without interest)
+    // remainingAmount includes interest, so we subtract it to get remaining principal
+    // If interestAmount is not available, calculate it from the difference
+    let interestAmount = loan.interestAmount;
+    if (interestAmount === undefined || interestAmount === 0) {
+      // Fallback: calculate interest from remainingAmount - borrowedAmount
+      // This works if no repayment has been made yet
+      interestAmount = Math.max(0, loan.remainingAmount - loan.borrowedAmount);
+    }
+    
+    const remainingPrincipal = Math.max(0, loan.remainingAmount - interestAmount);
+    
+    // Amount paid = original borrowed - remaining principal
+    const paidAmount = Math.max(0, loan.borrowedAmount - remainingPrincipal);
+    
+    // Calculate percentages based on original borrowed amount
+    const repaidPercentage = (paidAmount / loan.borrowedAmount) * 100;
+    const remainingPercentage = (remainingPrincipal / loan.borrowedAmount) * 100;
+    
+    return {
+      repaid: Math.max(0, Math.min(100, repaidPercentage)),
+      remaining: Math.max(0, Math.min(100, remainingPercentage))
+    };
+  };
+
+  const progress = calculateProgress();
+
   return (
     <div className="min-h-screen bg-[#0B0E11] py-8 px-4">
       <div className="max-w-3xl mx-auto">
@@ -147,15 +182,15 @@ export function Repay() {
               <motion.div
                 initial={{ width: '0%' }}
                 animate={{
-                  width: `${((loan.borrowedAmount - loan.remainingAmount) / loan.borrowedAmount) * 100}%`
+                  width: `${progress.repaid}%`
                 }}
                 transition={{ duration: 1 }}
                 className="h-full bg-gradient-to-r from-[#00D4FF] to-[#00FF85]"
               />
             </div>
             <div className="flex justify-between mt-2 text-xs text-gray-400">
-              <span>Repaid: {((loan.borrowedAmount - loan.remainingAmount) / loan.borrowedAmount * 100).toFixed(1)}%</span>
-              <span>Remaining: {(loan.remainingAmount / loan.borrowedAmount * 100).toFixed(1)}%</span>
+              <span>Repaid: {progress.repaid.toFixed(1)}%</span>
+              <span>Remaining: {progress.remaining.toFixed(1)}%</span>
             </div>
           </div>
 
