@@ -1,14 +1,65 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
-import { Lock, Info } from 'lucide-react';
+import { Lock, Info, Loader2, CheckCircle } from 'lucide-react';
+import { getUtxo } from '../services/vaultService';
 
 export function OrdinalPreview() {
   const navigate = useNavigate();
-  const { currentOrdinal } = useApp();
+  const { currentOrdinal, isIcpAuthenticated } = useApp();
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLocking, setIsLocking] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [utxoId, setUtxoId] = useState<bigint | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Calculate values
+  const btcValue = currentOrdinal ? currentOrdinal.satoshiValue / 100000000 : 0;
+  const maxLtv = 50; // 50%
+  const ckBtcAvailable = btcValue * (maxLtv / 100);
+  
+  // Animated values
+  const [displayedBtcValue, setDisplayedBtcValue] = useState(0);
+  const [displayedCkBtc, setDisplayedCkBtc] = useState(0);
+  
+  // Load UTXO ID from currentOrdinal if available
+  useEffect(() => {
+    if (currentOrdinal) {
+      if (currentOrdinal.utxoId) {
+        setUtxoId(currentOrdinal.utxoId);
+        console.log('✅ UTXO ID loaded:', currentOrdinal.utxoId);
+      }
+      setIsLoading(false);
+    }
+  }, [currentOrdinal]);
+
+  useEffect(() => {
+    if (currentOrdinal) {
+      setIsLoading(false);
+      
+      // Animate BTC value
+      const btcInterval = setInterval(() => {
+        setDisplayedBtcValue(prev => {
+          const increment = btcValue / 50;
+          return prev < btcValue ? Math.min(prev + increment, btcValue) : btcValue;
+        });
+      }, 20);
+      
+      // Animate ckBTC available
+      const ckBtcInterval = setInterval(() => {
+        setDisplayedCkBtc(prev => {
+          const increment = ckBtcAvailable / 50;
+          return prev < ckBtcAvailable ? Math.min(prev + increment, ckBtcAvailable) : ckBtcAvailable;
+        });
+      }, 20);
+      
+      return () => {
+        clearInterval(btcInterval);
+        clearInterval(ckBtcInterval);
+      };
+    }
+  }, [currentOrdinal, btcValue, ckBtcAvailable]);
 
   if (!currentOrdinal) {
     navigate('/scan');
@@ -17,9 +68,34 @@ export function OrdinalPreview() {
 
   const handleLock = async () => {
     setIsLocking(true);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsLocking(false);
-    navigate('/offer');
+    setError(null);
+    
+    try {
+      if (!isIcpAuthenticated) {
+        throw new Error('Please connect Internet Identity first.');
+      }
+      
+      if (!utxoId) {
+        // If UTXO ID is not available, we need to get it from the backend
+        // This should have been set when deposit_utxo was called in ScanOrdinal
+        // For now, we'll navigate to offer page - the actual lock happens when borrowing
+        console.log('⚠️ UTXO ID not found. Navigating to offer page...');
+        navigate('/offer');
+        return;
+      }
+      
+      // In production, you might want to call a lock_collateral method here
+      // For now, the lock happens automatically when borrowing
+      console.log('✅ Locking UTXO:', utxoId);
+      
+      // Navigate to offer page where the actual lock happens during borrow
+      navigate('/offer');
+    } catch (error: any) {
+      console.error('❌ Failed to lock ordinal:', error);
+      setError(error.message || 'Failed to lock ordinal. Please try again.');
+    } finally {
+      setIsLocking(false);
+    }
   };
 
   return (
@@ -43,26 +119,61 @@ export function OrdinalPreview() {
           >
             <motion.div
               whileHover={{ scale: 1.02, rotateY: 5 }}
-              className="relative aspect-square rounded-xl overflow-hidden bg-gray-800 mb-4"
+              className="relative aspect-square rounded-xl overflow-hidden bg-gradient-to-br from-gray-800 to-gray-900 mb-4 border border-gray-700/50"
             >
-              <img
-                src={currentOrdinal.imageUrl}
-                alt="Ordinal"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute top-4 right-4 bg-[#FFC700] text-[#0B0E11] px-3 py-1 rounded-full text-sm font-bold">
+              {currentOrdinal.imageUrl && currentOrdinal.imageUrl.startsWith('http') ? (
+                <img
+                  src={currentOrdinal.imageUrl}
+                  alt="Ordinal"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback if image fails to load
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center p-8">
+                  <div className="text-6xl mb-4">🎨</div>
+                  <div className="text-white text-lg font-semibold mb-2">Ordinal Inscription</div>
+                  <div className="text-gray-400 text-sm text-center">
+                    {currentOrdinal.inscriptionId.substring(0, 20)}...
+                  </div>
+                </div>
+              )}
+              <div className="absolute top-4 right-4 bg-[#FFC700] text-[#0B0E11] px-3 py-1 rounded-full text-sm font-bold shadow-lg">
                 Verified
+              </div>
+              <div className="absolute top-4 left-4 bg-[#00D4FF]/20 backdrop-blur-sm text-[#00D4FF] px-3 py-1 rounded-full text-xs font-semibold border border-[#00D4FF]/30">
+                Ordinal
               </div>
             </motion.div>
 
             <div className="space-y-3">
-              <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
-                <span className="text-gray-400">Inscription ID</span>
-                <span className="text-white font-mono text-sm">{currentOrdinal.inscriptionId}</span>
+              <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-gray-400 text-sm font-medium">Inscription ID</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(currentOrdinal.inscriptionId);
+                    }}
+                    className="text-[#00D4FF] hover:text-[#00FF85] text-xs font-medium transition-colors px-2 py-1 rounded hover:bg-[#00D4FF]/10"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <div className="bg-gray-900/50 rounded-lg px-3 py-2.5 border border-gray-700/30">
+                  <span className="text-white font-mono text-sm select-all">
+                    {currentOrdinal.inscriptionId.length > 30
+                      ? `${currentOrdinal.inscriptionId.substring(0, 15)}...${currentOrdinal.inscriptionId.substring(currentOrdinal.inscriptionId.length - 15)}`
+                      : currentOrdinal.inscriptionId}
+                  </span>
+                </div>
               </div>
-              <div className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg">
-                <span className="text-gray-400">Satoshi Value</span>
-                <span className="text-[#FFC700] font-bold">{currentOrdinal.satoshiValue.toLocaleString()} sats</span>
+              <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400 text-sm font-medium">Satoshi Value</span>
+                  <span className="text-[#FFC700] font-bold text-lg">{currentOrdinal.satoshiValue.toLocaleString()} sats</span>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -79,41 +190,80 @@ export function OrdinalPreview() {
               </h2>
 
               <div className="space-y-4 mb-6">
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-gray-400">Estimated Value</span>
-                    <span className="text-white font-bold">0.002 BTC</span>
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-6 h-6 text-[#00D4FF] animate-spin" />
+                    <span className="ml-2 text-gray-400">Loading Ordinal details...</span>
                   </div>
-                  <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: '100%' }}
-                      transition={{ delay: 0.5, duration: 1 }}
-                      className="h-full bg-gradient-to-r from-[#00D4FF] to-[#00FF85]"
-                    />
-                  </div>
-                </div>
+                ) : (
+                  <>
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-gray-400">Estimated Value</span>
+                        <motion.span 
+                          className="text-white font-bold text-lg"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                        >
+                          {displayedBtcValue.toFixed(6)} BTC
+                        </motion.span>
+                      </div>
+                      <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: '100%' }}
+                          transition={{ delay: 0.5, duration: 1 }}
+                          className="h-full bg-gradient-to-r from-[#00D4FF] to-[#00FF85]"
+                        />
+                      </div>
+                    </div>
 
-                <div className="p-4 bg-[#00D4FF]/10 rounded-xl border border-[#00D4FF]/20">
-                  <div className="flex items-start gap-2">
-                    <Info className="w-5 h-5 text-[#00D4FF] flex-shrink-0 mt-0.5" />
-                    <p className="text-sm text-gray-300">
-                      Your Ordinal will be securely locked in a smart contract vault.
-                      You can unlock it anytime by repaying your loan.
-                    </p>
-                  </div>
-                </div>
+                    <div className="p-4 bg-[#00D4FF]/10 rounded-xl border border-[#00D4FF]/20">
+                      <div className="flex items-start gap-2">
+                        <Info className="w-5 h-5 text-[#00D4FF] flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-gray-300">
+                          Your Ordinal will be securely locked in a smart contract vault.
+                          You can unlock it anytime by repaying your loan.
+                        </p>
+                      </div>
+                    </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-gray-800/50 rounded-xl text-center">
-                    <div className="text-2xl font-bold text-[#00D4FF] mb-1">50%</div>
-                    <div className="text-xs text-gray-400">Max LTV</div>
-                  </div>
-                  <div className="p-4 bg-gray-800/50 rounded-xl text-center">
-                    <div className="text-2xl font-bold text-[#FFC700] mb-1">0.001</div>
-                    <div className="text-xs text-gray-400">ckBTC Available</div>
-                  </div>
-                </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <motion.div 
+                        className="p-4 bg-gray-800/50 rounded-xl text-center border border-gray-700/50"
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: 0.3 }}
+                      >
+                        <motion.div 
+                          className="text-2xl font-bold text-[#00D4FF] mb-1"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: 0.5 }}
+                        >
+                          {maxLtv}%
+                        </motion.div>
+                        <div className="text-xs text-gray-400">Max LTV</div>
+                      </motion.div>
+                      <motion.div 
+                        className="p-4 bg-gray-800/50 rounded-xl text-center border border-gray-700/50"
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: 0.4 }}
+                      >
+                        <motion.div 
+                          className="text-2xl font-bold text-[#FFC700] mb-1"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: 0.6 }}
+                        >
+                          {displayedCkBtc.toFixed(6)}
+                        </motion.div>
+                        <div className="text-xs text-gray-400">ckBTC Available</div>
+                      </motion.div>
+                    </div>
+                  </>
+                )}
               </div>
 
               <motion.button
@@ -145,23 +295,50 @@ export function OrdinalPreview() {
               onClick={(e) => e.stopPropagation()}
               className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-8 max-w-md w-full border border-gray-700"
             >
-              <Lock className="w-12 h-12 text-[#FFC700] mx-auto mb-4" />
-              <h3 className="text-2xl font-bold text-white text-center mb-4">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 200 }}
+                className="flex justify-center mb-4"
+              >
+                <Lock className="w-12 h-12 text-[#FFC700]" />
+              </motion.div>
+              <h3 className="text-2xl font-bold text-white text-center mb-2">
                 Confirm Deposit
               </h3>
-              <p className="text-gray-300 text-center mb-6">
-                You're about to lock your Ordinal as collateral. This action will transfer
-                custody to the vault smart contract.
+              <p className="text-gray-300 text-center mb-6 text-sm">
+                ⚠️ You're about to lock your Ordinal as collateral. This action will transfer
+                custody to the vault smart contract. You can unlock it anytime by repaying your loan.
               </p>
 
               <div className="space-y-3 mb-6">
-                <div className="flex justify-between p-3 bg-gray-800/50 rounded-lg">
-                  <span className="text-gray-400">UTXO</span>
-                  <span className="text-white font-mono text-sm">{currentOrdinal.utxo.substring(0, 12)}...</span>
+                <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-gray-400 text-sm">UTXO</span>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(currentOrdinal.utxo)}
+                      className="text-[#00D4FF] hover:text-[#00FF85] text-xs transition-colors"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <span className="text-white font-mono text-sm break-all">
+                    {currentOrdinal.utxo.length > 30
+                      ? `${currentOrdinal.utxo.substring(0, 15)}...${currentOrdinal.utxo.substring(currentOrdinal.utxo.length - 15)}`
+                      : currentOrdinal.utxo}
+                  </span>
                 </div>
-                <div className="flex justify-between p-3 bg-gray-800/50 rounded-lg">
-                  <span className="text-gray-400">Lock Duration</span>
-                  <span className="text-white">Until repaid</span>
+                <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400 text-sm">Collateral Value</span>
+                    <span className="text-white font-semibold">{btcValue.toFixed(6)} BTC</span>
+                  </div>
+                </div>
+                <div className="p-3 bg-gray-800/50 rounded-lg border border-gray-700/50">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400 text-sm">Lock Duration</span>
+                    <span className="text-white">Until repaid</span>
+                  </div>
                 </div>
               </div>
 
@@ -173,13 +350,25 @@ export function OrdinalPreview() {
                 >
                   Cancel
                 </button>
-                <button
+                <motion.button
                   onClick={handleLock}
                   disabled={isLocking}
-                  className="py-3 rounded-xl font-bold bg-gradient-to-r from-[#00D4FF] to-[#00FF85] text-[#0B0E11] hover:shadow-lg transition-all disabled:opacity-50"
+                  whileHover={!isLocking ? { scale: 1.05 } : {}}
+                  whileTap={!isLocking ? { scale: 0.95 } : {}}
+                  className="py-3 rounded-xl font-bold bg-gradient-to-r from-[#00D4FF] to-[#00FF85] text-[#0B0E11] hover:shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {isLocking ? 'Locking...' : 'Confirm'}
-                </button>
+                  {isLocking ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Locking...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4" />
+                      Confirm
+                    </>
+                  )}
+                </motion.button>
               </div>
             </motion.div>
           </motion.div>

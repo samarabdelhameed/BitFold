@@ -37,28 +37,49 @@ export async function depositUtxo(request: {
     metadata?: string;
   };
 }): Promise<bigint> {
-  const actor = await getVaultActor();
-  
-  const depositRequest: DepositUtxoRequest = {
-    txid: request.txid,
-    vout: request.vout,
-    amount: request.amount,
-    address: request.address,
-    ordinal_info: request.ordinalInfo ? [{
-      inscription_id: request.ordinalInfo.inscription_id,
-      content_type: request.ordinalInfo.content_type,
-      content_preview: request.ordinalInfo.content_preview ? [request.ordinalInfo.content_preview] : [],
-      metadata: request.ordinalInfo.metadata ? [request.ordinalInfo.metadata] : [],
-    }] : [],
-  };
+  try {
+    const actor = await getVaultActor();
+    
+    if (!actor) {
+      throw new Error('Vault actor not initialized. Please connect Internet Identity first.');
+    }
+    
+    const depositRequest: DepositUtxoRequest = {
+      txid: request.txid,
+      vout: request.vout,
+      amount: request.amount,
+      address: request.address,
+      ordinal_info: request.ordinalInfo ? [{
+        inscription_id: request.ordinalInfo.inscription_id,
+        content_type: request.ordinalInfo.content_type,
+        content_preview: request.ordinalInfo.content_preview ? [request.ordinalInfo.content_preview] : [],
+        metadata: request.ordinalInfo.metadata ? [request.ordinalInfo.metadata] : [],
+      }] : [],
+    };
 
-  const result = await actor.deposit_utxo(depositRequest);
-  
-  if ('Err' in result) {
-    throw new Error(result.Err);
+    console.log('📤 Calling deposit_utxo with:', depositRequest);
+    const result = await actor.deposit_utxo(depositRequest);
+    
+    if ('Err' in result) {
+      throw new Error(result.Err);
+    }
+    
+    console.log('✅ deposit_utxo successful, UTXO ID:', result.Ok);
+    return result.Ok;
+  } catch (error: any) {
+    console.error('❌ depositUtxo error:', error);
+    
+    // Better error messages
+    if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
+      throw new Error('Authentication failed. Please connect Internet Identity and try again.');
+    } else if (error.message?.includes('404') || error.message?.includes('Not Found')) {
+      throw new Error('Vault canister not found. Please make sure the canister is deployed. Run: dfx deploy');
+    } else if (error.message?.includes('certificate') || error.message?.includes('signature')) {
+      throw new Error('Certificate verification failed. Please check your Internet Identity connection.');
+    }
+    
+    throw error;
   }
-  
-  return result.Ok;
 }
 
 /**
@@ -116,8 +137,17 @@ export async function withdrawCollateral(utxoId: bigint): Promise<void> {
  * Get user's collateral (UTXOs)
  */
 export async function getCollateral(): Promise<UTXO[]> {
-  const actor = await getVaultActor();
-  return await actor.get_collateral();
+  try {
+    const actor = await getVaultActor();
+    return await actor.get_collateral();
+  } catch (error: any) {
+    console.error('Error getting collateral:', error);
+    // Re-throw with more context
+    if (error?.message) {
+      throw new Error(error.message);
+    }
+    throw new Error('Failed to get collateral. Please check your connection and authentication.');
+  }
 }
 
 /**

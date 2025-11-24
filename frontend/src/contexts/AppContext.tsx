@@ -4,9 +4,14 @@ import { resetVaultActor } from '../services/vaultService';
 
 interface Ordinal {
   utxo: string;
+  utxoId?: bigint; // UTXO ID from backend
   inscriptionId: string;
   imageUrl: string;
   satoshiValue: number;
+  txid?: string;
+  vout?: number;
+  amount?: number;
+  ordinalInfo?: any;
 }
 
 interface Loan {

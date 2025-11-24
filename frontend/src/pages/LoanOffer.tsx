@@ -45,15 +45,22 @@ export function LoanOffer() {
     setIsBorrowing(true);
 
     try {
+      if (!currentOrdinal?.utxoId) {
+        throw new Error('UTXO ID not found. Please scan your Ordinal again.');
+      }
+      
       // Convert BTC to satoshis
       const amountInSats = BigInt(Math.floor(borrowAmount * 100000000));
       
-      // Get UTXO ID from current ordinal (assuming it's stored in utxo field)
-      // In production, you'd parse this properly
-      const utxoId = BigInt(1); // Placeholder - should come from deposit response
+      // Get UTXO ID from currentOrdinal (set during deposit_utxo)
+      const utxoId = currentOrdinal.utxoId;
       
-      // Call backend to borrow
+      console.log('📤 Calling borrow with:', { utxoId, amountInSats, utxo: currentOrdinal.utxo });
+      
+      // Call backend to borrow (this will lock the collateral automatically)
       const loanId = await borrow(utxoId, amountInSats);
+      
+      console.log('✅ borrow successful! Loan ID:', loanId);
 
       const newLoan = {
         id: loanId.toString(),
