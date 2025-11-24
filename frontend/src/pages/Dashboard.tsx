@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useApp } from '../contexts/AppContext';
 import { Wallet, TrendingUp, Lock, Home, ArrowLeft } from 'lucide-react';
 import { LoanChart } from '../components/LoanChart';
-import { getUserLoans, getCollateral } from '../services/vaultService';
+import { getUserLoans, getCollateral, getVaultStats, getUserStats } from '../services/vaultService';
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -28,21 +28,32 @@ export function Dashboard() {
         ]);
 
         // Convert backend loans to frontend format
-        const formattedLoans = backendLoans.map(loan => ({
-          id: loan.id.toString(),
-          utxo: `${loan.collateral_utxo_id}`,
-          ordinal: {
+        // Calculate remaining debt including interest (same as canister's calculate_loan_value)
+        const formattedLoans = backendLoans.map(loan => {
+          // Calculate interest: (borrowed_amount * interest_rate) / 10000
+          const interest = (Number(loan.borrowed_amount) * Number(loan.interest_rate)) / 10000;
+          // Total debt = borrowed + interest
+          const totalDebt = Number(loan.borrowed_amount) + interest;
+          // Remaining debt = total - repaid
+          const remainingDebt = Math.max(0, totalDebt - Number(loan.repaid_amount));
+          
+          return {
+            id: loan.id.toString(),
             utxo: `${loan.collateral_utxo_id}`,
-            inscriptionId: `${loan.collateral_utxo_id}...i0`,
-            imageUrl: 'https://images.pexels.com/photos/844124/pexels-photo-844124.jpeg?auto=compress&cs=tinysrgb&w=400',
-            satoshiValue: 100000000
-          },
-          borrowedAmount: Number(loan.borrowed_amount) / 100000000, // Convert sats to BTC
-          remainingAmount: Number(loan.borrowed_amount - loan.repaid_amount) / 100000000,
-          status: 'Active' in loan.status ? 'ACTIVE' : 'Repaid' in loan.status ? 'REPAID' : 'LIQUIDATED',
-          ltv: 70, // Placeholder
-          createdAt: new Date(Number(loan.created_at) / 1000000).toISOString()
-        }));
+            ordinal: {
+              utxo: `${loan.collateral_utxo_id}`,
+              inscriptionId: `${loan.collateral_utxo_id}...i0`,
+              imageUrl: 'https://images.pexels.com/photos/844124/pexels-photo-844124.jpeg?auto=compress&cs=tinysrgb&w=400',
+              satoshiValue: 100000000
+            },
+            borrowedAmount: Number(loan.borrowed_amount) / 100000000, // Convert sats to ckBTC
+            remainingAmount: remainingDebt / 100000000, // Convert sats to ckBTC (includes interest)
+            interestAmount: interest / 100000000, // Interest in ckBTC
+            status: 'Active' in loan.status ? 'ACTIVE' : 'Repaid' in loan.status ? 'REPAID' : 'LIQUIDATED',
+            ltv: 70, // Placeholder
+            createdAt: new Date(Number(loan.created_at) / 1000000).toISOString()
+          };
+        });
 
         setLoans(formattedLoans);
         setError('');
@@ -57,7 +68,9 @@ export function Dashboard() {
     fetchData();
   }, [isIcpAuthenticated, setLoans]);
 
+  // Calculate totals from real loan data
   const totalBorrowed = loans.reduce((sum, loan) => sum + loan.borrowedAmount, 0);
+  const totalRemaining = loans.reduce((sum, loan) => sum + loan.remainingAmount, 0);
   const totalCollateral = loans.length;
   const activeLoans = loans.filter(l => l.status === 'ACTIVE').length;
 
@@ -147,7 +160,7 @@ export function Dashboard() {
           <div className="mb-8">
             <LoanChart
               borrowedAmount={totalBorrowed}
-              remainingAmount={loans.reduce((sum, loan) => sum + loan.remainingAmount, 0)}
+              remainingAmount={totalRemaining}
             />
           </div>
         )}
@@ -223,7 +236,7 @@ export function Dashboard() {
                       </div>
                       <div>
                         <div className="text-gray-400 text-sm mb-1">Remaining</div>
-                        <div className="text-white font-bold">
+                        <div className="text-[#00FF85] font-bold">
                           {loan.remainingAmount.toFixed(4)} ckBTC
                         </div>
                       </div>

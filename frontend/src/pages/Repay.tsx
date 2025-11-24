@@ -34,17 +34,16 @@ export function Repay() {
       // Call backend to repay
       await repay(loanIdBigInt, amountInSats);
 
-      const newRemaining = Math.max(0, loan.remainingAmount - repayAmount);
-      updateLoan(loan.id, {
-        remainingAmount: newRemaining,
-        status: newRemaining === 0 ? 'REPAID' : 'ACTIVE'
-      });
-
+      // Refresh loan data from canister to get accurate remaining amount
+      // The canister will calculate the new remaining amount including interest
       setIsRepaying(false);
       setShowSuccess(true);
 
+      // Navigate to dashboard which will refresh the data
       setTimeout(() => {
         navigate('/dashboard');
+        // Force a page reload to ensure fresh data
+        window.location.reload();
       }, 2000);
     } catch (err: any) {
       console.error('Repay failed:', err);
@@ -107,7 +106,9 @@ export function Repay() {
               </div>
               <div className="flex justify-between p-3 bg-gray-800/50 rounded-lg">
                 <span className="text-gray-400">Interest</span>
-                <span className="text-[#00FF85] font-bold">0 ckBTC</span>
+                <span className="text-[#00FF85] font-bold">
+                  {(loan.interestAmount || 0).toFixed(4)} ckBTC
+                </span>
               </div>
             </div>
           </div>

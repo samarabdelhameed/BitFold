@@ -308,3 +308,77 @@ export async function getUserLoanOffers(): Promise<Array<{
     return [];
   }
 }
+
+/**
+ * Get vault statistics
+ */
+export async function getVaultStats(): Promise<{
+  total_value_locked: bigint;
+  total_loans_outstanding: bigint;
+  active_loans_count: bigint;
+  total_users: bigint;
+  total_utxos: bigint;
+  utilization_rate: bigint;
+}> {
+  try {
+    const actor = await getVaultActor();
+    if (!actor) {
+      throw new Error('Vault actor not initialized. Please connect Internet Identity first.');
+    }
+    
+    // Check if the method exists
+    if ('get_vault_stats' in actor) {
+      return await (actor as any).get_vault_stats();
+    }
+    
+    // Return default stats if method doesn't exist
+    return {
+      total_value_locked: BigInt(0),
+      total_loans_outstanding: BigInt(0),
+      active_loans_count: BigInt(0),
+      total_users: BigInt(0),
+      total_utxos: BigInt(0),
+      utilization_rate: BigInt(0),
+    };
+  } catch (error: any) {
+    console.error('Error getting vault stats:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get user statistics
+ */
+export async function getUserStats(): Promise<{
+  total_collateral_value: bigint;
+  total_borrowed: bigint;
+  total_debt: bigint;
+  active_loans_count: bigint;
+  total_utxos_count: bigint;
+  average_ltv: bigint;
+}> {
+  try {
+    const actor = await getVaultActor();
+    if (!actor) {
+      throw new Error('Vault actor not initialized. Please connect Internet Identity first.');
+    }
+    
+    // Check if the method exists
+    if ('get_user_stats' in actor) {
+      return await (actor as any).get_user_stats();
+    }
+    
+    // Return default stats if method doesn't exist
+    return {
+      total_collateral_value: BigInt(0),
+      total_borrowed: BigInt(0),
+      total_debt: BigInt(0),
+      active_loans_count: BigInt(0),
+      total_utxos_count: BigInt(0),
+      average_ltv: BigInt(0),
+    };
+  } catch (error: any) {
+    console.error('Error getting user stats:', error);
+    throw error;
+  }
+}

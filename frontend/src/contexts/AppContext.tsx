@@ -20,6 +20,7 @@ interface Loan {
   ordinal: Ordinal;
   borrowedAmount: number;
   remainingAmount: number;
+  interestAmount?: number; // Interest amount in ckBTC
   status: 'ACTIVE' | 'REPAID' | 'LIQUIDATED';
   ltv: number;
   createdAt: string;

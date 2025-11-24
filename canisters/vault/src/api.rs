@@ -179,10 +179,10 @@ pub async fn borrow(request: BorrowRequest) -> Result<LoanId, String> {
         return Err("UTXO has been withdrawn".to_string());
     }
     
-    // If UTXO is Locked, check if there's an active loan offer
+    // Calculate max borrowable based on UTXO status
     let max_borrowable = if utxo.status == UtxoStatus::Locked {
-        // Check for active loan offer
-        let loan_offer = State::with_read(|state| {
+        // For locked UTXOs, try to find an active loan offer first
+        let loan_offer_max = State::with_read(|state| {
             state.user_loan_offers
                 .get(&caller)
                 .and_then(|offer_ids| {
@@ -198,12 +198,12 @@ pub async fn borrow(request: BorrowRequest) -> Result<LoanId, String> {
                 })
         });
         
-        match loan_offer {
-            Some(max) => max,
-            None => {
-                return Err("UTXO is locked but no active loan offer found. Please create a loan offer first.".to_string());
-            }
-        }
+        // If no active loan offer found, calculate max borrowable directly
+        // This allows borrowing from locked UTXOs even without an active offer
+        loan_offer_max.unwrap_or_else(|| {
+            ic_cdk::println!("⚠️ No active loan offer found for locked UTXO {}, calculating max borrowable directly", request.utxo_id);
+            calculate_max_borrowable(&utxo, 5000) // 50% LTV
+        })
     } else {
         // UTXO is Deposited, calculate max borrowable (50% LTV = 5000 basis points)
         calculate_max_borrowable(&utxo, 5000)

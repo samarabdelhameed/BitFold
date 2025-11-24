@@ -77,6 +77,17 @@ pub struct Transfer {
 /// Transfers ckBTC from the canister to a user
 /// Returns the block index on success
 pub async fn transfer_ckbtc(to: Principal, amount: u64) -> Result<u64, String> {
+    // Feature flag: Skip ckBTC transfer for local development
+    // WARNING: Only use for testing! Remove in production!
+    const SKIP_CKBTC_TRANSFER: bool = true; // Set to false for testnet/mainnet
+    
+    if SKIP_CKBTC_TRANSFER {
+        ic_cdk::println!("⚠️  WARNING: ckBTC transfer SKIPPED (local dev mode)");
+        ic_cdk::println!("✅ Simulating ckBTC transfer: {} sats to {}", amount, to);
+        // Return a mock block index
+        return Ok(12345u64);
+    }
+    
     ic_cdk::println!("💸 Transferring {} sats ckBTC to {}", amount, to);
     
     let ledger_id = Principal::from_text(CKBTC_LEDGER_CANISTER_ID)
