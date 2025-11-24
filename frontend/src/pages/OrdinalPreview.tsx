@@ -119,17 +119,28 @@ export function OrdinalPreview() {
           const newUtxoId = await depositUtxo(utxoData);
           console.log('✅ UTXO deposited successfully! UTXO ID:', newUtxoId);
           
+          // Update local state first
+          setUtxoId(newUtxoId);
+          finalUtxoId = newUtxoId;
+          
           // Update currentOrdinal with the new UTXO ID
           const updatedOrdinal = {
             ...currentOrdinal,
             utxoId: newUtxoId
           };
           setCurrentOrdinal(updatedOrdinal);
-          setUtxoId(newUtxoId);
-          finalUtxoId = newUtxoId;
+          
+          // Also save to localStorage as backup
+          localStorage.setItem('lastUtxoId', newUtxoId.toString());
+          console.log('✅ Updated currentOrdinal with UTXO ID:', newUtxoId);
         } catch (depositError: unknown) {
           const depositErr = depositError as { message?: string };
-          if (depositErr.message?.includes('Not authenticated') || depositErr.message?.includes('Authentication failed')) {
+          if (depositErr.message?.includes('Not authenticated') || 
+              depositErr.message?.includes('Authentication failed') ||
+              depositErr.message?.includes('certificate') ||
+              depositErr.message?.includes('signature') ||
+              depositErr.message?.includes('403') ||
+              depositErr.message?.includes('Forbidden')) {
             throw new Error('Authentication failed. Please reconnect Internet Identity and try again.');
           }
           throw depositError;
@@ -146,7 +157,12 @@ export function OrdinalPreview() {
         navigate('/offer');
       } catch (lockError: unknown) {
         const lockErr = lockError as { message?: string };
-        if (lockErr.message?.includes('Not authenticated') || lockErr.message?.includes('Authentication failed')) {
+        if (lockErr.message?.includes('Not authenticated') || 
+            lockErr.message?.includes('Authentication failed') ||
+            lockErr.message?.includes('certificate') ||
+            lockErr.message?.includes('signature') ||
+            lockErr.message?.includes('403') ||
+            lockErr.message?.includes('Forbidden')) {
           throw new Error('Authentication failed. Please reconnect Internet Identity and try again.');
         }
         throw lockError;

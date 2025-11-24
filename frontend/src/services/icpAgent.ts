@@ -3,7 +3,7 @@ import { AuthClient } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
 
 // Canister IDs - Use environment variable or fallback to local
-const VAULT_CANISTER_ID = import.meta.env.VITE_VAULT_CANISTER_ID || 'bkyz2-fmaaa-aaaaa-qaaaq-cai';
+const VAULT_CANISTER_ID = import.meta.env.VITE_VAULT_CANISTER_ID || 'br5f7-7uaaa-aaaaa-qaaca-cai';
 
 // Determine host based on environment
 const HOST = import.meta.env.VITE_DFX_NETWORK === 'ic' 
@@ -25,7 +25,7 @@ export async function initAgent(requireAuth: boolean = false): Promise<HttpAgent
     authClient = await AuthClient.create();
   }
   
-  // Get current identity (may be anonymous if not authenticated)
+  // Get fresh identity from auth client (important for expired delegations)
   identity = authClient.getIdentity();
   
   // Check if authenticated
@@ -44,8 +44,19 @@ export async function initAgent(requireAuth: boolean = false): Promise<HttpAgent
     }
   }
   
-  // If agent exists and authenticated, return it (unless identity changed)
-  if (agent && authenticated) {
+  // Always recreate agent when requireAuth is true to ensure fresh identity/delegation
+  // This fixes stale delegation issues
+  if (requireAuth && authenticated) {
+    agent = null; // Force recreation
+  }
+  
+  // Always recreate agent for local development to ensure fresh root key
+  if (isLocal) {
+    agent = null;
+  }
+  
+  // If agent exists and we don't need to recreate it, return it
+  if (agent && !requireAuth) {
     return agent;
   }
 
@@ -56,14 +67,7 @@ export async function initAgent(requireAuth: boolean = false): Promise<HttpAgent
     verifyQuerySignatures: false, // Disable query signature verification for local dev
   });
   
-  // For local development, disable all signature verification
-  if (isLocal) {
-    (agent as any)._verifyQuerySignatures = false;
-    // Disable certificate verification for local replica
-    (agent as any).rootKey = null;
-  }
-
-  // Fetch root key for local development
+  // Fetch root key for local development BEFORE any other operations
   if (isLocal) {
     try {
       await agent.fetchRootKey();
@@ -135,10 +139,42 @@ export async function login(): Promise<void> {
     } else {
       // Local development: MUST use local Internet Identity
       // Using mainnet II with local replica causes signature verification failures
-      const localCanisterId = import.meta.env.VITE_INTERNET_IDENTITY_CANISTER_ID || 'bw4dl-smaaa-aaaaa-qaacq-cai';
       
+      // Try to get canister ID from environment variable first
+      // Vite only exposes variables prefixed with VITE_ to the client
+      let localCanisterId = import.meta.env.VITE_INTERNET_IDENTITY_CANISTER_ID || 
+                            import.meta.env.CANISTER_ID_INTERNET_IDENTITY;
+      
+      // If not in env, try to get from localStorage or use fallback
+      if (!localCanisterId) {
+        // Try to get from localStorage (if set by initialization script)
+        try {
+          const storedId = localStorage.getItem('internet_identity_canister_id');
+          if (storedId) {
+            localCanisterId = storedId;
+            console.log('📋 Found Internet Identity Canister ID in localStorage');
+          }
+        } catch (e) {
+          // Ignore localStorage errors
+        }
+        
+        // If still not found, use the current deployed canister ID
+        // This should match what dfx deploy internet_identity creates
+        if (!localCanisterId) {
+          // Use the actual canister ID from dfx (this should be set in .env with VITE_ prefix)
+          localCanisterId = 'be2us-64aaa-aaaaa-qaabq-cai'; // Default local II canister ID
+          console.warn('⚠️ Internet Identity Canister ID not found in environment variables.');
+          console.warn('💡 Using fallback ID. To fix, add to .env file:');
+          console.warn('   VITE_INTERNET_IDENTITY_CANISTER_ID=be2us-64aaa-aaaaa-qaabq-cai');
+          console.warn('   Then restart the dev server.');
+        }
+      }
+      
+      // Use the standard localhost format for Internet Identity
+      // Format: http://<canister-id>.localhost:4943
       identityProvider = `http://${localCanisterId}.localhost:4943`;
       console.log(`ℹ️ Using local Internet Identity: ${identityProvider}`);
+      console.log(`📋 Canister ID: ${localCanisterId}`);
       console.log('💡 If this fails, make sure Internet Identity is deployed locally:');
       console.log('   dfx deploy internet_identity');
     }
@@ -147,13 +183,16 @@ export async function login(): Promise<void> {
       identityProvider,
       onSuccess: async () => {
         try {
+          // Get fresh identity after login
           identity = authClient!.getIdentity();
           // Reset agent to force reinitialization with new identity
           agent = null;
-          // Reinitialize agent with new identity
-          await initAgent();
+          // Reinitialize agent with new identity (requireAuth = true to get fresh delegation)
+          await initAgent(true);
+          console.log('✅ Authentication successful, agent reinitialized');
           resolve();
         } catch (error) {
+          console.error('❌ Error reinitializing agent after login:', error);
           reject(error);
         }
       },

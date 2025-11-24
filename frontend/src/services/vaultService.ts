@@ -10,10 +10,10 @@ let vaultActor: _SERVICE | null = null;
 async function getVaultActor(): Promise<_SERVICE> {
   // For update calls, require authentication
   // Always reinitialize to ensure we have the latest identity
-  // This is important after login/logout
+  // This is important after login/logout or expired delegations
   await initAgent(true); // requireAuth = true for update calls
   
-  // Create new actor with fresh agent (in case identity changed)
+  // Always create new actor with fresh agent to avoid stale identity issues
   vaultActor = createActor<_SERVICE>(getVaultCanisterId(), idlFactory);
   return vaultActor;
 }
@@ -41,6 +41,8 @@ export async function depositUtxo(request: {
   };
 }): Promise<bigint> {
   try {
+    // Reset actor to ensure fresh authentication
+    resetVaultActor();
     const actor = await getVaultActor();
     
     if (!actor) {
@@ -72,13 +74,21 @@ export async function depositUtxo(request: {
   } catch (error: any) {
     console.error('❌ depositUtxo error:', error);
     
-    // Better error messages
-    if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
-      throw new Error('Authentication failed. Please connect Internet Identity and try again.');
+    // Better error messages with recovery suggestions
+    if (error.message?.includes('403') || error.message?.includes('Forbidden') || 
+        error.message?.includes('certificate') || error.message?.includes('signature') ||
+        error.message?.includes('Invalid delegation')) {
+      // Try to clear stale auth and suggest reconnection
+      const { clearAuth } = await import('./icpAgent');
+      console.warn('⚠️ Authentication issue detected. Clearing stale credentials...');
+      try {
+        await clearAuth();
+      } catch (clearErr) {
+        console.warn('Could not clear auth:', clearErr);
+      }
+      throw new Error('Authentication failed. Please reconnect Internet Identity and try again.');
     } else if (error.message?.includes('404') || error.message?.includes('Not Found')) {
       throw new Error('Vault canister not found. Please make sure the canister is deployed. Run: dfx deploy');
-    } else if (error.message?.includes('certificate') || error.message?.includes('signature')) {
-      throw new Error('Certificate verification failed. Please check your Internet Identity connection.');
     }
     
     throw error;
@@ -158,6 +168,7 @@ export async function withdrawCollateral(utxoId: bigint): Promise<void> {
  */
 export async function getCollateral(): Promise<UTXO[]> {
   try {
+    // Use getVaultActor which handles authentication properly
     const actor = await getVaultActor();
     return await actor.get_collateral();
   } catch (error: any) {
@@ -174,7 +185,9 @@ export async function getCollateral(): Promise<UTXO[]> {
  * Get user's loans
  */
 export async function getUserLoans(): Promise<Loan[]> {
-  const actor = await getVaultActor();
+  // For query calls, we can use requireAuth = false
+  await initAgent(false);
+  const actor = createActor<_SERVICE>(getVaultCanisterId(), idlFactory);
   return await actor.get_user_loans();
 }
 
@@ -182,7 +195,9 @@ export async function getUserLoans(): Promise<Loan[]> {
  * Get specific UTXO by ID
  */
 export async function getUtxo(utxoId: bigint): Promise<UTXO | null> {
-  const actor = await getVaultActor();
+  // For query calls, we can use requireAuth = false
+  await initAgent(false);
+  const actor = createActor<_SERVICE>(getVaultCanisterId(), idlFactory);
   const result = await actor.get_utxo(utxoId);
   return result.length > 0 ? result[0] : null;
 }
@@ -191,7 +206,9 @@ export async function getUtxo(utxoId: bigint): Promise<UTXO | null> {
  * Get specific loan by ID
  */
 export async function getLoan(loanId: bigint): Promise<Loan | null> {
-  const actor = await getVaultActor();
+  // For query calls, we can use requireAuth = false
+  await initAgent(false);
+  const actor = createActor<_SERVICE>(getVaultCanisterId(), idlFactory);
   const result = await actor.get_loan(loanId);
   return result.length > 0 ? result[0] : null;
 }
@@ -255,7 +272,10 @@ export async function getLoanOfferByUtxo(utxoId: bigint): Promise<{
   created_at: bigint;
 } | null> {
   try {
-    const actor = await getVaultActor();
+    // For query calls, we can use requireAuth = false
+    await initAgent(false);
+    const actor = createActor<_SERVICE>(getVaultCanisterId(), idlFactory);
+    
     if (!actor) {
       throw new Error('Vault actor not initialized. Please connect Internet Identity first.');
     }

@@ -19,16 +19,30 @@ export function LoanOffer() {
   // Load real data from canister
   useEffect(() => {
     const loadLoanOfferData = async () => {
-      if (!currentOrdinal?.utxoId) {
+      console.log('🔍 LoanOffer: Checking currentOrdinal:', currentOrdinal);
+      console.log('🔍 LoanOffer: UTXO ID:', currentOrdinal?.utxoId);
+      
+      // Try to get UTXO ID from currentOrdinal or localStorage
+      let utxoId = currentOrdinal?.utxoId;
+      if (!utxoId) {
+        const savedUtxoId = localStorage.getItem('lastUtxoId');
+        if (savedUtxoId) {
+          utxoId = BigInt(savedUtxoId);
+          console.log('📥 Loaded UTXO ID from localStorage:', utxoId);
+        }
+      }
+      
+      if (!utxoId) {
+        console.warn('⚠️ LoanOffer: No UTXO ID found');
         setIsLoading(false);
         return;
       }
 
       try {
-        console.log('📥 Loading loan offer data for UTXO:', currentOrdinal.utxoId);
+        console.log('📥 Loading loan offer data for UTXO:', utxoId);
         
         // Try to get loan offer first
-        const loanOffer = await getLoanOfferByUtxo(currentOrdinal.utxoId);
+        const loanOffer = await getLoanOfferByUtxo(utxoId);
         
         if (loanOffer) {
           // Convert satoshis to ckBTC (1 ckBTC = 100,000,000 satoshis)
@@ -66,7 +80,7 @@ export function LoanOffer() {
         } else {
           // Fallback: get UTXO and calculate max borrowable (50% LTV)
           console.log('⚠️ No loan offer found, calculating from UTXO...');
-          const utxo = await getUtxo(currentOrdinal.utxoId);
+          const utxo = await getUtxo(utxoId);
           
           if (utxo) {
             const maxBorrowableSats = (Number(utxo.amount) * 5000) / 10000; // 50% LTV
@@ -120,15 +134,22 @@ export function LoanOffer() {
     setIsBorrowing(true);
 
     try {
-      if (!currentOrdinal?.utxoId) {
+      // Try to get UTXO ID from currentOrdinal or localStorage
+      let utxoId = currentOrdinal?.utxoId;
+      if (!utxoId) {
+        const savedUtxoId = localStorage.getItem('lastUtxoId');
+        if (savedUtxoId) {
+          utxoId = BigInt(savedUtxoId);
+          console.log('📥 Using UTXO ID from localStorage:', utxoId);
+        }
+      }
+      
+      if (!utxoId) {
         throw new Error('UTXO ID not found. Please scan your Ordinal again.');
       }
       
       // Convert ckBTC to satoshis (1 ckBTC = 100,000,000 satoshis)
       const amountInSats = BigInt(Math.floor(borrowAmount * 100000000));
-      
-      // Get UTXO ID from currentOrdinal (set during deposit_utxo)
-      const utxoId = currentOrdinal.utxoId;
       
       console.log('📤 ========================================');
       console.log('📤 Starting Borrow Process');
