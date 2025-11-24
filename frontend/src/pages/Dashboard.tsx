@@ -27,34 +27,50 @@ export function Dashboard() {
           getCollateral()
         ]);
 
+        console.log(`📊 Dashboard: Fetched ${backendLoans.length} loan(s) from canister`);
+        console.log('📋 Raw loans data:', backendLoans);
+
         // Convert backend loans to frontend format
         // Calculate remaining debt including interest (same as canister's calculate_loan_value)
-        const formattedLoans = backendLoans.map(loan => {
-          // Calculate interest: (borrowed_amount * interest_rate) / 10000
-          const interest = (Number(loan.borrowed_amount) * Number(loan.interest_rate)) / 10000;
-          // Total debt = borrowed + interest
-          const totalDebt = Number(loan.borrowed_amount) + interest;
-          // Remaining debt = total - repaid
-          const remainingDebt = Math.max(0, totalDebt - Number(loan.repaid_amount));
-          
-          return {
-            id: loan.id.toString(),
-            utxo: `${loan.collateral_utxo_id}`,
-            ordinal: {
+        // Remove duplicates by loan ID to prevent showing the same loan twice
+        const seenLoanIds = new Set<string>();
+        const formattedLoans = backendLoans
+          .filter(loan => {
+            const loanId = loan.id.toString();
+            if (seenLoanIds.has(loanId)) {
+              console.warn(`⚠️ Duplicate loan detected: ${loanId}, skipping...`);
+              return false;
+            }
+            seenLoanIds.add(loanId);
+            return true;
+          })
+          .map(loan => {
+            // Calculate interest: (borrowed_amount * interest_rate) / 10000
+            const interest = (Number(loan.borrowed_amount) * Number(loan.interest_rate)) / 10000;
+            // Total debt = borrowed + interest
+            const totalDebt = Number(loan.borrowed_amount) + interest;
+            // Remaining debt = total - repaid
+            const remainingDebt = Math.max(0, totalDebt - Number(loan.repaid_amount));
+            
+            return {
+              id: loan.id.toString(),
               utxo: `${loan.collateral_utxo_id}`,
-              inscriptionId: `${loan.collateral_utxo_id}...i0`,
-              imageUrl: 'https://images.pexels.com/photos/844124/pexels-photo-844124.jpeg?auto=compress&cs=tinysrgb&w=400',
-              satoshiValue: 100000000
-            },
-            borrowedAmount: Number(loan.borrowed_amount) / 100000000, // Convert sats to ckBTC
-            remainingAmount: remainingDebt / 100000000, // Convert sats to ckBTC (includes interest)
-            interestAmount: interest / 100000000, // Interest in ckBTC
-            status: 'Active' in loan.status ? 'ACTIVE' : 'Repaid' in loan.status ? 'REPAID' : 'LIQUIDATED',
-            ltv: 70, // Placeholder
-            createdAt: new Date(Number(loan.created_at) / 1000000).toISOString()
-          };
-        });
+              ordinal: {
+                utxo: `${loan.collateral_utxo_id}`,
+                inscriptionId: `${loan.collateral_utxo_id}...i0`,
+                imageUrl: 'https://images.pexels.com/photos/844124/pexels-photo-844124.jpeg?auto=compress&cs=tinysrgb&w=400',
+                satoshiValue: 100000000
+              },
+              borrowedAmount: Number(loan.borrowed_amount) / 100000000, // Convert sats to ckBTC
+              remainingAmount: remainingDebt / 100000000, // Convert sats to ckBTC (includes interest)
+              interestAmount: interest / 100000000, // Interest in ckBTC
+              status: 'Active' in loan.status ? 'ACTIVE' : 'Repaid' in loan.status ? 'REPAID' : 'LIQUIDATED',
+              ltv: 70, // Placeholder
+              createdAt: new Date(Number(loan.created_at) / 1000000).toISOString()
+            };
+          });
 
+        console.log(`✅ Loaded ${formattedLoans.length} unique loan(s) from canister:`, formattedLoans);
         setLoans(formattedLoans);
         setError('');
       } catch (err: any) {
