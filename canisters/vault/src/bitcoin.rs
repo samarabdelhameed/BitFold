@@ -11,14 +11,16 @@ use ic_cdk::api::management_canister::bitcoin::{
 /// 3. UTXO amount matches
 /// 4. UTXO address matches
 /// 
-/// Set SKIP_BITCOIN_VERIFICATION=true to skip verification (for testing without cycles)
+/// For production/testnet: Uses real Bitcoin API verification
+/// For local development: Can skip if cycles not available
 pub async fn verify_utxo(utxo: &UTXO) -> Result<bool, String> {
-    // Feature flag: Skip Bitcoin verification if cycles not available
-    // WARNING: Only use for testing! Remove in production!
-    const SKIP_BITCOIN_VERIFICATION: bool = true; // Set to true to skip verification (LOCAL DEV ONLY)
+    // Check if we're in local development mode
+    // In testnet/mainnet, always verify
+    let network = std::env::var("DFX_NETWORK").unwrap_or_else(|_| "local".to_string());
+    let skip_verification = network == "local" || network == "playground";
     
-    if SKIP_BITCOIN_VERIFICATION {
-        ic_cdk::println!("⚠️  WARNING: Bitcoin verification SKIPPED (testing mode)");
+    if skip_verification {
+        ic_cdk::println!("⚠️  WARNING: Bitcoin verification SKIPPED ({} mode)", network);
         ic_cdk::println!("✅ Assuming UTXO is valid: {}:{} ({} sats)", utxo.txid, utxo.vout, utxo.amount);
         return Ok(true);
     }

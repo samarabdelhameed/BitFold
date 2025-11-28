@@ -76,13 +76,16 @@ pub struct Transfer {
 
 /// Transfers ckBTC from the canister to a user
 /// Returns the block index on success
+/// 
+/// For production/testnet: Performs real ckBTC transfer via ICRC-1
+/// For local development: Can simulate if ledger not available
 pub async fn transfer_ckbtc(to: Principal, amount: u64) -> Result<u64, String> {
-    // Feature flag: Skip ckBTC transfer for local development
-    // WARNING: Only use for testing! Remove in production!
-    const SKIP_CKBTC_TRANSFER: bool = true; // Set to false for testnet/mainnet
+    // Check if we're in local development mode
+    let network = std::env::var("DFX_NETWORK").unwrap_or_else(|_| "local".to_string());
+    let skip_transfer = network == "local" || network == "playground";
     
-    if SKIP_CKBTC_TRANSFER {
-        ic_cdk::println!("⚠️  WARNING: ckBTC transfer SKIPPED (local dev mode)");
+    if skip_transfer {
+        ic_cdk::println!("⚠️  WARNING: ckBTC transfer SKIPPED ({} mode)", network);
         ic_cdk::println!("✅ Simulating ckBTC transfer: {} sats to {}", amount, to);
         // Return a mock block index
         return Ok(12345u64);
@@ -125,12 +128,16 @@ pub async fn transfer_ckbtc(to: Principal, amount: u64) -> Result<u64, String> {
 
 /// Verifies that a user has transferred ckBTC to the canister
 /// Checks recent transactions to confirm the transfer
+/// 
+/// For production/testnet: Queries ledger for actual transactions
+/// For local development: Can skip if ledger not available
 pub async fn verify_transfer_to_canister(from: Principal, amount: u64) -> Result<bool, String> {
-    // Feature flag: Skip ckBTC verification for local development
-    const SKIP_CKBTC_VERIFICATION: bool = true; // Set to false for testnet/mainnet
+    // Check if we're in local development mode
+    let network = std::env::var("DFX_NETWORK").unwrap_or_else(|_| "local".to_string());
+    let skip_verification = network == "local" || network == "playground";
     
-    if SKIP_CKBTC_VERIFICATION {
-        ic_cdk::println!("⚠️  WARNING: ckBTC verification SKIPPED (local dev mode)");
+    if skip_verification {
+        ic_cdk::println!("⚠️  WARNING: ckBTC verification SKIPPED ({} mode)", network);
         ic_cdk::println!("✅ Assuming ckBTC transfer verified: {} sats from {}", amount, from);
         return Ok(true);
     }

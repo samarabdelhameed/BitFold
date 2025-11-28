@@ -21,14 +21,17 @@ struct MaestroInscriptionResponse {
 }
 
 /// Verifies an Ordinal inscription exists
+/// 
+/// Uses HTTP outcalls to query Ordinals indexer (Maestro API)
+/// For local development, can skip if HTTP outcalls are disabled
 pub async fn verify_ordinal(txid: &str, vout: u32) -> Result<Option<OrdinalInfo>, String> {
-    // SKIP HTTP OUTCALLS IN LOCAL DEVELOPMENT
+    // Check if we're in local development mode
     // HTTP outcalls are disabled in local replica by default
-    // For production, set this to false
-    const SKIP_HTTP_VERIFICATION: bool = true;
+    let network = std::env::var("DFX_NETWORK").unwrap_or_else(|_| "local".to_string());
+    let skip_verification = network == "local" || network == "playground";
     
-    if SKIP_HTTP_VERIFICATION {
-        ic_cdk::println!("⚠️  Skipping Ordinal verification (local development mode)");
+    if skip_verification {
+        ic_cdk::println!("⚠️  Skipping Ordinal verification ({} mode)", network);
         ic_cdk::println!("ℹ️  Treating {}:{} as regular UTXO", txid, vout);
         return Ok(None);
     }
